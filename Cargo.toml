@@ -1,0 +1,10 @@
+[workspace]
+
+members = [
+    "elucidator",
+    "elucidator-db",
+    "pyelucidator",
+    "elucidatorc",
+    "elucitools",
+]
+resolver = "2"
