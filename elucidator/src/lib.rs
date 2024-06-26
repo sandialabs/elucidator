@@ -1,5 +1,10 @@
 //! Main elucidator library.
-//!
+
+use crate::error::*;
+pub use representable::Representable;
+
+pub mod error;
+pub mod representable;
 
 /// Represent array sizing for a Member.
 /// Generally not useful except when constructing Members for users, though it is used in this
@@ -39,7 +44,7 @@ pub enum Dtype {
 }
 
 impl Dtype {
-    fn from(s: &str) -> Result<Dtype, ElucidatorError> {
+    pub fn from(s: &str) -> Result<Dtype, ElucidatorError> {
         let dt = match ascii_trimmed_or_err(s)? {
             "u8" => Self::Byte,
             "u16" => Self::UnsignedInteger16,
@@ -132,7 +137,7 @@ pub struct TypeSpecification {
 }
 
 impl TypeSpecification {
-    fn from(s: &str) -> Result<TypeSpecification, ElucidatorError> {
+    pub fn from(s: &str) -> Result<TypeSpecification, ElucidatorError> {
         let ss = validated_trimmed_or_err(s)?;
         match ss.find("[") {
             Some(lbracket_index) => {
@@ -173,7 +178,7 @@ pub struct MemberSpecification {
 }
 
 impl MemberSpecification {
-    fn from(s: &str) -> Result<MemberSpecification, ElucidatorError> {
+    pub fn from(s: &str) -> Result<MemberSpecification, ElucidatorError> {
         let ss = ascii_trimmed_or_err(s)?;
         if let Some((ident, typespec)) = ss.split_once(":") {
             validate_identifier(ident)?;
@@ -193,22 +198,6 @@ impl MemberSpecification {
             )
         }
     }
-}
-
-
-#[derive(Debug, PartialEq)]
-pub enum ElucidatorError {
-    ParsingError{offender: String, reason: Invalidity}
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Invalidity {
-    NonAsciiEncoding,
-    IdentifierStartsNonAlphabetical,
-    IllegalCharacters(Vec<char>),
-    IllegalDataType,
-    MissingIdSpecDelimiter,
-    UnexpectedEndOfExpression,
 }
 
 #[cfg(test)]
