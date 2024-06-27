@@ -61,6 +61,7 @@ Compliant implementations must implement all data types.
 | Unsigned 16-bit integer       | u16                   |
 | Unsigned 32-bit integer       | u32                   |
 | Unsigned 64-bit integer       | u64                   |
+| Signed 8-bit integer          | i8                    |
 | Signed 16-bit integer         | i16                   |
 | Signed 32-bit integer         | i32                   |
 | Signed 64-bit integer         | i64                   |
