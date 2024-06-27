@@ -302,3 +302,38 @@ impl Representable for String {
         Err(ElucidatorError::ConversionError{from: "string".to_string(), to: "f64".to_string()})
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn fast_ce<T>(from: &str, to: &str) -> Result<T, ElucidatorError> {
+        Err(ElucidatorError::ConversionError{
+            from: from.to_string(),
+            to: to.to_string(),
+        })
+    }
+    fn fast_ne<T>(from: &str, to: &str) -> Result<T, ElucidatorError> {
+        Err(ElucidatorError::NarrowingError{
+            from: from.to_string(),
+            to: to.to_string(),
+        })
+    }
+    #[test]
+    fn u8_to_u64() {
+        let from = u8::MAX / 2;
+        let to = from.as_u64();
+        assert_eq!(to, Ok(from as u64));
+    }
+    #[test]
+    fn u64_to_i64() {
+        let num = u64::MAX;
+        let to = num.as_i64();
+        assert_eq!(to, fast_ne("u64", "i64"));
+    }
+    #[test]
+    fn string_to_u64() {
+        let s = String::from("sunny day");
+        let to = s.as_u64();
+        assert_eq!(to, fast_ce("string", "u64"));
+    }
+}
