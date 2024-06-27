@@ -188,6 +188,19 @@ impl Representable for u64 {
     }
 }
 
+impl Representable for i8 {
+    fn is_numeric(&self) -> bool { true }
+    fn is_array(&self) -> bool { false }
+    fn get_dtype(&self) -> Dtype { Dtype::SignedInteger8 }
+    fn is_signed(&self) -> bool { true }
+    fn is_integer(&self) -> bool { true }
+    fn is_floating(&self) -> bool { false }
+    fn as_buffer(&self) -> Vec<u8> { self.to_le_bytes().iter().map(|x| *x).collect() }
+    fn as_u64(&self) -> Result<u64> { Ok((*self).try_into().unwrap()) }
+    fn as_i64(&self) -> Result<i64> { Ok((*self).try_into().unwrap()) }
+    fn as_f64(&self) -> Result<f64> { Ok(f64::from(*self)) }
+}
+
 impl Representable for i16 {
     fn is_numeric(&self) -> bool { true }
     fn is_array(&self) -> bool { false }
