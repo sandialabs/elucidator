@@ -54,8 +54,9 @@ Whitespace is ignored except for the `context` string, as Identifiers and Dtypes
 The following table indicates all allowable data types.
 Compliant implementations must implement all data types.
 
+
 | Name                          | String Representation |
-| :____________________________ | :____________________ |
+|-------------------------------|-----------------------|
 | Byte                          | u8                    |
 | Unsigned 16-bit integer       | u16                   |
 | Unsigned 32-bit integer       | u32                   |
