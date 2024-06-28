@@ -140,8 +140,8 @@ impl Representable for u8 {
     fn is_integer(&self) -> bool { true }
     fn is_floating(&self) -> bool { false }
     fn as_buffer(&self) -> Vec<u8> { self.to_le_bytes().iter().map(|x| *x).collect() }
-    fn as_u64(&self) -> Result<u64> { Ok((*self).try_into().unwrap()) }
-    fn as_i64(&self) -> Result<i64> { Ok((*self).try_into().unwrap()) }
+    fn as_u64(&self) -> Result<u64> { Ok(*self as u64) }
+    fn as_i64(&self) -> Result<i64> { Ok(*self as i64) }
     fn as_f64(&self) -> Result<f64> { Ok(f64::from(*self)) }
 }
 
@@ -153,8 +153,8 @@ impl Representable for u16 {
     fn is_integer(&self) -> bool { true }
     fn is_floating(&self) -> bool { false }
     fn as_buffer(&self) -> Vec<u8> { self.to_le_bytes().iter().map(|x| *x).collect() }
-    fn as_u64(&self) -> Result<u64> { Ok((*self).try_into().unwrap()) }
-    fn as_i64(&self) -> Result<i64> { Ok((*self).try_into().unwrap()) }
+    fn as_u64(&self) -> Result<u64> { Ok(*self as u64) }
+    fn as_i64(&self) -> Result<i64> { Ok(*self as i64) }
     fn as_f64(&self) -> Result<f64> { Ok(f64::from(*self)) }
 }
 
@@ -166,8 +166,8 @@ impl Representable for u32 {
     fn is_integer(&self) -> bool { true }
     fn is_floating(&self) -> bool { false }
     fn as_buffer(&self) -> Vec<u8> { self.to_le_bytes().iter().map(|x| *x).collect() }
-    fn as_u64(&self) -> Result<u64> { Ok((*self).try_into().unwrap()) }
-    fn as_i64(&self) -> Result<i64> { Ok((*self).try_into().unwrap()) }
+    fn as_u64(&self) -> Result<u64> { Ok(*self as u64) }
+    fn as_i64(&self) -> Result<i64> { Ok(*self as i64) }
     fn as_f64(&self) -> Result<f64> { Ok(f64::from(*self)) }
 }
 
@@ -180,12 +180,8 @@ impl Representable for u64 {
     fn is_floating(&self) -> bool { false }
     fn as_buffer(&self) -> Vec<u8> { self.to_le_bytes().iter().map(|x| *x).collect() }
     fn as_u64(&self) -> Result<u64> { Ok(*self) }
-    fn as_i64(&self) -> Result<i64> { 
-        Err(ElucidatorError::NarrowingError{from: "u64".to_string(), to: "i64".to_string()})
-    }
-    fn as_f64(&self) -> Result<f64> {
-        Err(ElucidatorError::NarrowingError{from: "u64".to_string(), to: "f64".to_string()})
-    }
+    fn as_i64(&self) -> Result<i64> { ElucidatorError::new_narrowing("u64", "i64") }
+    fn as_f64(&self) -> Result<f64> { ElucidatorError::new_narrowing("u64", "f64") }
 }
 
 impl Representable for i8 {
@@ -196,8 +192,8 @@ impl Representable for i8 {
     fn is_integer(&self) -> bool { true }
     fn is_floating(&self) -> bool { false }
     fn as_buffer(&self) -> Vec<u8> { self.to_le_bytes().iter().map(|x| *x).collect() }
-    fn as_u64(&self) -> Result<u64> { Ok((*self).try_into().unwrap()) }
-    fn as_i64(&self) -> Result<i64> { Ok((*self).try_into().unwrap()) }
+    fn as_u64(&self) -> Result<u64> { ElucidatorError::new_narrowing("i8", "u64") }
+    fn as_i64(&self) -> Result<i64> { Ok(*self as i64) }
     fn as_f64(&self) -> Result<f64> { Ok(f64::from(*self)) }
 }
 
@@ -209,8 +205,8 @@ impl Representable for i16 {
     fn is_integer(&self) -> bool { true }
     fn is_floating(&self) -> bool { false }
     fn as_buffer(&self) -> Vec<u8> { self.to_le_bytes().iter().map(|x| *x).collect() }
-    fn as_u64(&self) -> Result<u64> { Ok((*self).try_into().unwrap()) }
-    fn as_i64(&self) -> Result<i64> { Ok((*self).try_into().unwrap()) }
+    fn as_u64(&self) -> Result<u64> { ElucidatorError::new_narrowing("i16", "u64") }
+    fn as_i64(&self) -> Result<i64> { Ok(*self as i64) }
     fn as_f64(&self) -> Result<f64> { Ok(f64::from(*self)) }
 }
 
@@ -222,8 +218,8 @@ impl Representable for i32 {
     fn is_integer(&self) -> bool { true }
     fn is_floating(&self) -> bool { false }
     fn as_buffer(&self) -> Vec<u8> { self.to_le_bytes().iter().map(|x| *x).collect() }
-    fn as_u64(&self) -> Result<u64> { Ok((*self).try_into().unwrap()) }
-    fn as_i64(&self) -> Result<i64> { Ok((*self).try_into().unwrap()) }
+    fn as_u64(&self) -> Result<u64> { ElucidatorError::new_narrowing("i32", "u64") }
+    fn as_i64(&self) -> Result<i64> { Ok(*self as i64) }
     fn as_f64(&self) -> Result<f64> { Ok(f64::from(*self)) }
 }
 
@@ -235,13 +231,9 @@ impl Representable for i64 {
     fn is_integer(&self) -> bool { true }
     fn is_floating(&self) -> bool { false }
     fn as_buffer(&self) -> Vec<u8> { self.to_le_bytes().iter().map(|x| *x).collect() }
-    fn as_u64(&self) -> Result<u64> {
-        Err(ElucidatorError::NarrowingError{from: "i64".to_string(), to: "u64".to_string()})
-    }
+    fn as_u64(&self) -> Result<u64> { ElucidatorError::new_narrowing("i64", "u64") }
     fn as_i64(&self) -> Result<i64> { Ok(*self) }
-    fn as_f64(&self) -> Result<f64> {
-        Err(ElucidatorError::NarrowingError{from: "i64".to_string(), to: "f64".to_string()})
-    }
+    fn as_f64(&self) -> Result<f64> { ElucidatorError::new_narrowing("i64", "f64")}
 }
 
 impl Representable for f32 {
@@ -252,12 +244,8 @@ impl Representable for f32 {
     fn is_integer(&self) -> bool { false }
     fn is_floating(&self) -> bool { true }
     fn as_buffer(&self) -> Vec<u8> { self.to_le_bytes().iter().map(|x| *x).collect() }
-    fn as_u64(&self) -> Result<u64> {
-        Err(ElucidatorError::NarrowingError{from: "f32".to_string(), to: "u64".to_string()})
-    }
-    fn as_i64(&self) -> Result<i64> { 
-        Err(ElucidatorError::NarrowingError{from: "f32".to_string(), to: "i64".to_string()})
-    }
+    fn as_u64(&self) -> Result<u64> { ElucidatorError::new_narrowing("f32", "u64") }
+    fn as_i64(&self) -> Result<i64> { ElucidatorError::new_narrowing("f32", "i64") }
     fn as_f64(&self) -> Result<f64> { Ok(*self as f64) }
 }
 
@@ -269,12 +257,8 @@ impl Representable for f64 {
     fn is_integer(&self) -> bool { false }
     fn is_floating(&self) -> bool { true }
     fn as_buffer(&self) -> Vec<u8> { self.to_le_bytes().iter().map(|x| *x).collect() }
-    fn as_u64(&self) -> Result<u64> {
-        Err(ElucidatorError::NarrowingError{from: "f64".to_string(), to: "u64".to_string()})
-    }
-    fn as_i64(&self) -> Result<i64> { 
-        Err(ElucidatorError::NarrowingError{from: "f64".to_string(), to: "i64".to_string()})
-    }
+    fn as_u64(&self) -> Result<u64> { ElucidatorError::new_narrowing("f64", "u64") }
+    fn as_i64(&self) -> Result<i64> { ElucidatorError::new_narrowing("f64", "i64") }
     fn as_f64(&self) -> Result<f64> { Ok(*self) }
 }
 
@@ -305,32 +289,16 @@ impl Representable for String {
         final_buffer.append(&mut contents_buffer);
         final_buffer
     }
-    fn as_u64(&self) -> Result<u64> {
-        Err(ElucidatorError::ConversionError{from: "string".to_string(), to: "u64".to_string()})
-    }
-    fn as_i64(&self) -> Result<i64> { 
-        Err(ElucidatorError::ConversionError{from: "string".to_string(), to: "i64".to_string()})
-    }
-    fn as_f64(&self) -> Result<f64> {
-        Err(ElucidatorError::ConversionError{from: "string".to_string(), to: "f64".to_string()})
-    }
+    fn as_u64(&self) -> Result<u64> { ElucidatorError::new_conversion("string", "u64") }
+    fn as_i64(&self) -> Result<i64> { ElucidatorError::new_conversion("string", "i64") }
+    fn as_f64(&self) -> Result<f64> { ElucidatorError::new_conversion("string", "f64") }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn fast_ce<T>(from: &str, to: &str) -> Result<T, ElucidatorError> {
-        Err(ElucidatorError::ConversionError{
-            from: from.to_string(),
-            to: to.to_string(),
-        })
-    }
-    fn fast_ne<T>(from: &str, to: &str) -> Result<T, ElucidatorError> {
-        Err(ElucidatorError::NarrowingError{
-            from: from.to_string(),
-            to: to.to_string(),
-        })
-    }
+
+    // u8 (byte) -> X
     #[test]
     fn u8_to_u64() {
         let from = u8::MAX / 2;
@@ -338,15 +306,214 @@ mod tests {
         assert_eq!(to, Ok(from as u64));
     }
     #[test]
+    fn u8_to_i64() {
+        let from = u8::MAX / 2;
+        let to = from.as_i64();
+        assert_eq!(to, Ok(from as i64)); 
+    }
+    #[test]
+    fn u8_to_f64() {
+        let from = u8::MAX / 2;
+        let to = from.as_f64();
+        assert_eq!(to, Ok(from as f64)); 
+    }
+
+    // u16 -> X
+    #[test]
+    fn u16_to_u64() {
+        let from = u16::MAX / 2;
+        let to = from.as_u64();
+        assert_eq!(to, Ok(from as u64));
+    }
+    #[test]
+    fn u16_to_i64() {
+        let from = u16::MAX / 2;
+        let to = from.as_i64();
+        assert_eq!(to, Ok(from as i64)); 
+    }
+    #[test]
+    fn u16_to_f64() {
+        let from = u16::MAX / 2;
+        let to = from.as_f64();
+        assert_eq!(to, Ok(from as f64)); 
+    }
+
+    // u32 -> X
+    #[test]
+    fn u32_to_u64() {
+        let from = u32::MAX / 2;
+        let to = from.as_u64();
+        assert_eq!(to, Ok(from as u64));
+    }
+    #[test]
+    fn u32_to_i64() {
+        let from = u32::MAX / 2;
+        let to = from.as_i64();
+        assert_eq!(to, Ok(from as i64)); 
+    }
+    #[test]
+    fn u32_to_f64() {
+        let from = u32::MAX / 2;
+        let to = from.as_f64();
+        assert_eq!(to, Ok(from as f64)); 
+    } 
+
+    // u64 -> X
+    #[test]
+    fn u64_to_u64() {
+        let from = u64::MAX / 2;
+        let to = from.as_u64();
+        assert_eq!(to, Ok(from as u64));
+    }
+    #[test]
     fn u64_to_i64() {
         let num = u64::MAX;
         let to = num.as_i64();
-        assert_eq!(to, fast_ne("u64", "i64"));
+        assert_eq!(to, ElucidatorError::new_narrowing("u64", "i64"));
     }
+    #[test]
+    fn u64_to_f64() {
+        let from = u64::MAX / 2;
+        let to = from.as_f64();
+        assert_eq!(to, ElucidatorError::new_narrowing("u64", "f64")); 
+    }
+
+    // i8 -> X
+    #[test]
+    fn i8_to_u64() {
+        let from: i8 = -100;
+        let to = from.as_u64();
+        assert_eq!(to, ElucidatorError::new_narrowing("i8", "u64"));
+    }
+    #[test]
+    fn i8_to_i64() {
+        let from: i8 = -100;
+        let to = from.as_i64();
+        assert_eq!(to, Ok(from as i64)); 
+    }
+    #[test]
+    fn i8_to_f64() {
+        let from: i8 = -100;
+        let to = from.as_f64();
+        assert_eq!(to, Ok(from as f64)); 
+    } 
+
+    // i16 -> X
+    #[test]
+    fn i16_to_u64() {
+        let from: i16 = -100;
+        let to = from.as_u64();
+        assert_eq!(to, ElucidatorError::new_narrowing("i16", "u64"));
+    }
+    #[test]
+    fn i16_to_i64() {
+        let from: i16 = -100;
+        let to = from.as_i64();
+        assert_eq!(to, Ok(from as i64)); 
+    }
+    #[test]
+    fn i16_to_f64() {
+        let from: i16 = -100;
+        let to = from.as_f64();
+        assert_eq!(to, Ok(from as f64)); 
+    }
+
+    // i32 -> X
+    #[test]
+    fn i32_to_u64() {
+        let from: i32 = -100;
+        let to = from.as_u64();
+        assert_eq!(to, ElucidatorError::new_narrowing("i32", "u64"));
+    }
+    #[test]
+    fn i32_to_i64() {
+        let from: i32 = -100;
+        let to = from.as_i64();
+        assert_eq!(to, Ok(from as i64)); 
+    }
+    #[test]
+    fn i32_to_f64() {
+        let from: i32 = -100;
+        let to = from.as_f64();
+        assert_eq!(to, Ok(from as f64)); 
+    }
+
+    // i64 -> X
+    #[test]
+    fn i64_to_u64() {
+        let from: i64 = -100;
+        let to = from.as_u64();
+        assert_eq!(to, ElucidatorError::new_narrowing("i64", "u64"));
+    }
+    #[test]
+    fn i64_to_i64() {
+        let from: i64 = -100;
+        let to = from.as_i64();
+        assert_eq!(to, Ok(from as i64)); 
+    }
+    #[test]
+    fn i64_to_f64() {
+        let from: i64 = -100;
+        let to = from.as_f64();
+        assert_eq!(to, ElucidatorError::new_narrowing("i64", "f64")); 
+    } 
+
+    // f32 -> X
+    #[test]
+    fn f32_to_u64() {
+        let from: f32 = 0.0;
+        let to = from.as_u64();
+        assert_eq!(to, ElucidatorError::new_narrowing("f32", "u64"));
+    }
+    #[test]
+    fn f32_to_i64() {
+        let from: f32 = 0.0;
+        let to = from.as_i64();
+        assert_eq!(to, ElucidatorError::new_narrowing("f32", "i64"))
+    }
+    #[test]
+    fn f32_to_f64() {
+        let from: f32 = 0.0;
+        let to = from.as_f64();
+        assert_eq!(to, Ok(from as f64)); 
+    } 
+
+    // f64 -> X
+    #[test]
+    fn f64_to_u64() {
+        let from: f64 = 0.0;
+        let to = from.as_u64();
+        assert_eq!(to, ElucidatorError::new_narrowing("f64", "u64"));
+    }
+    #[test]
+    fn f64_to_i64() {
+        let from: f64 = 0.0;
+        let to = from.as_i64();
+        assert_eq!(to, ElucidatorError::new_narrowing("f64", "i64"))
+    }
+    #[test]
+    fn f64_to_f64() {
+        let from: f64 = 0.0;
+        let to = from.as_f64();
+        assert_eq!(to, Ok(from as f64)); 
+    } 
+    
+    // string -> X
     #[test]
     fn string_to_u64() {
         let s = String::from("sunny day");
         let to = s.as_u64();
-        assert_eq!(to, fast_ce("string", "u64"));
+        assert_eq!(to, ElucidatorError::new_conversion("string", "u64"));
+    }
+    #[test]
+    fn string_to_i64() {
+        let s = String::from("sunny day");
+        let to = s.as_i64();
+        assert_eq!(to, ElucidatorError::new_conversion("string", "i64"));
+    }    #[test]
+    fn string_to_f64() {
+        let s = String::from("sunny day");
+        let to = s.as_f64();
+        assert_eq!(to, ElucidatorError::new_conversion("string", "f64"));
     }
 }

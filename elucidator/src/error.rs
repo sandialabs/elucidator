@@ -10,6 +10,21 @@ pub enum ElucidatorError {
     NarrowingError{from: String, to: String},
 }
 
+impl ElucidatorError {
+    pub fn new_conversion<T>(from: &str, to: &str) -> Result<T, ElucidatorError> {
+        Err(ElucidatorError::ConversionError{
+            from: from.to_string(),
+            to: to.to_string(),
+        })
+    }
+    pub fn new_narrowing<T>(from: &str, to: &str) -> Result<T, ElucidatorError> {
+        Err(ElucidatorError::NarrowingError{
+            from: from.to_string(),
+            to: to.to_string(),
+        })
+    }
+}
+
 impl fmt::Display for ElucidatorError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let m = match self {
