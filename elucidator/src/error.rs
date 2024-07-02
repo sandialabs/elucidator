@@ -62,6 +62,7 @@ pub enum ParsingFailure {
     IllegalDataType,
     MissingIdSpecDelimiter,
     UnexpectedEndOfExpression,
+    IllegalArraySizing,
 }
 
 impl fmt::Display for ParsingFailure {
@@ -86,6 +87,9 @@ impl fmt::Display for ParsingFailure {
             Self::UnexpectedEndOfExpression => {
                 "Unexpected end of expression".to_string()
             },
+            Self::IllegalArraySizing => {
+                "The size of the array is not valid; valid sizes must be unsigned integers or empty".to_string()
+            }
         };
         write!(f, "{m}")
     }
