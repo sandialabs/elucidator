@@ -1,24 +1,30 @@
-use std::fmt;
+use std::{fmt, string::FromUtf8Error};
 
 #[derive(Debug, PartialEq)]
 pub enum ElucidatorError {
-    /// Errors related to parsing strings, see [`Invalidity`] for reasons parsing might fail
-    ParsingError{offender: String, reason: Invalidity},
+    /// Errors related to parsing strings, see [`ParsingFailure`] for reasons parsing might fail
+    Parsing{offender: String, reason: ParsingFailure},
     /// Errors related to converting between incompatible types
-    ConversionError{from: String, to: String},
+    Conversion{from: String, to: String},
     /// Errors related to attempt to cast from high precision or range to low precision or range
-    NarrowingError{from: String, to: String},
+    Narrowing{from: String, to: String},
+    /// Errors related to interpreting a dtype from a given buffer
+    BufferSizing{expected: usize, found: usize},
+    /// Errors when parsing from UTF8
+    FromUtf8{source: FromUtf8Error}
 }
+
+
 
 impl ElucidatorError {
     pub fn new_conversion<T>(from: &str, to: &str) -> Result<T, ElucidatorError> {
-        Err(ElucidatorError::ConversionError{
+        Err(ElucidatorError::Conversion{
             from: from.to_string(),
             to: to.to_string(),
         })
     }
     pub fn new_narrowing<T>(from: &str, to: &str) -> Result<T, ElucidatorError> {
-        Err(ElucidatorError::NarrowingError{
+        Err(ElucidatorError::Narrowing{
             from: from.to_string(),
             to: to.to_string(),
         })
@@ -28,22 +34,28 @@ impl ElucidatorError {
 impl fmt::Display for ElucidatorError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let m = match self {
-            Self::ParsingError{offender, reason} => {
+            Self::Parsing{offender, reason} => {
                 format!("Failed to parse expression \"{offender}\": {reason}")
             },
-            Self::ConversionError{from, to} => {
+            Self::Conversion{from, to} => {
                 format!("Cannot convert {from} to {to}")
             },
-            Self::NarrowingError{from, to} => {
+            Self::Narrowing{from, to} => {
                 format!("Conversion from {from} to {to} would cause narrowing")
             },
+            Self::BufferSizing { expected, found } => {
+                format!("Buffer expected size of {expected} bytes, found {found} instead")
+            },
+            Self::FromUtf8 { source } => {
+                format!("{source}")
+            }
         };
         write!(f, "{m}")
     }
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Invalidity {
+pub enum ParsingFailure {
     NonAsciiEncoding,
     IdentifierStartsNonAlphabetical,
     IllegalCharacters(Vec<char>),
@@ -52,7 +64,7 @@ pub enum Invalidity {
     UnexpectedEndOfExpression,
 }
 
-impl fmt::Display for Invalidity {
+impl fmt::Display for ParsingFailure {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let m = match self {
             Self::NonAsciiEncoding => { "Non ASCII encoding".to_string() },

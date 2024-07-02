@@ -128,6 +128,8 @@ pub trait Representable {
     fn as_i64(&self) -> Result<i64>;
     /// Attempt to convert this type into an f64
     fn as_f64(&self) -> Result<f64>;
+    /// Attempt to convert this type into a String
+    fn as_string(&self) -> Result<String>;
 }
 
 // TODO: do this as a macro
@@ -143,6 +145,9 @@ impl Representable for u8 {
     fn as_u64(&self) -> Result<u64> { Ok(*self as u64) }
     fn as_i64(&self) -> Result<i64> { Ok(*self as i64) }
     fn as_f64(&self) -> Result<f64> { Ok(f64::from(*self)) }
+    fn as_string(&self) -> Result<String> {
+        ElucidatorError::new_conversion("u8", "string")
+    }
 }
 
 impl Representable for u16 {
@@ -156,6 +161,9 @@ impl Representable for u16 {
     fn as_u64(&self) -> Result<u64> { Ok(*self as u64) }
     fn as_i64(&self) -> Result<i64> { Ok(*self as i64) }
     fn as_f64(&self) -> Result<f64> { Ok(f64::from(*self)) }
+    fn as_string(&self) -> Result<String> {
+        ElucidatorError::new_conversion("u16", "string")
+    }
 }
 
 impl Representable for u32 {
@@ -169,6 +177,9 @@ impl Representable for u32 {
     fn as_u64(&self) -> Result<u64> { Ok(*self as u64) }
     fn as_i64(&self) -> Result<i64> { Ok(*self as i64) }
     fn as_f64(&self) -> Result<f64> { Ok(f64::from(*self)) }
+    fn as_string(&self) -> Result<String> {
+        ElucidatorError::new_conversion("u32", "string")
+    }
 }
 
 impl Representable for u64 {
@@ -182,6 +193,9 @@ impl Representable for u64 {
     fn as_u64(&self) -> Result<u64> { Ok(*self) }
     fn as_i64(&self) -> Result<i64> { ElucidatorError::new_narrowing("u64", "i64") }
     fn as_f64(&self) -> Result<f64> { ElucidatorError::new_narrowing("u64", "f64") }
+    fn as_string(&self) -> Result<String> {
+        ElucidatorError::new_conversion("u64", "string")
+    }
 }
 
 impl Representable for i8 {
@@ -195,6 +209,9 @@ impl Representable for i8 {
     fn as_u64(&self) -> Result<u64> { ElucidatorError::new_narrowing("i8", "u64") }
     fn as_i64(&self) -> Result<i64> { Ok(*self as i64) }
     fn as_f64(&self) -> Result<f64> { Ok(f64::from(*self)) }
+    fn as_string(&self) -> Result<String> {
+        ElucidatorError::new_conversion("i8", "string")
+    }
 }
 
 impl Representable for i16 {
@@ -208,6 +225,9 @@ impl Representable for i16 {
     fn as_u64(&self) -> Result<u64> { ElucidatorError::new_narrowing("i16", "u64") }
     fn as_i64(&self) -> Result<i64> { Ok(*self as i64) }
     fn as_f64(&self) -> Result<f64> { Ok(f64::from(*self)) }
+    fn as_string(&self) -> Result<String> {
+        ElucidatorError::new_conversion("i16", "string")
+    }
 }
 
 impl Representable for i32 {
@@ -221,6 +241,9 @@ impl Representable for i32 {
     fn as_u64(&self) -> Result<u64> { ElucidatorError::new_narrowing("i32", "u64") }
     fn as_i64(&self) -> Result<i64> { Ok(*self as i64) }
     fn as_f64(&self) -> Result<f64> { Ok(f64::from(*self)) }
+    fn as_string(&self) -> Result<String> {
+        ElucidatorError::new_conversion("i32", "string")
+    }
 }
 
 impl Representable for i64 {
@@ -234,6 +257,9 @@ impl Representable for i64 {
     fn as_u64(&self) -> Result<u64> { ElucidatorError::new_narrowing("i64", "u64") }
     fn as_i64(&self) -> Result<i64> { Ok(*self) }
     fn as_f64(&self) -> Result<f64> { ElucidatorError::new_narrowing("i64", "f64")}
+    fn as_string(&self) -> Result<String> {
+        ElucidatorError::new_conversion("i64", "string")
+    }
 }
 
 impl Representable for f32 {
@@ -247,6 +273,9 @@ impl Representable for f32 {
     fn as_u64(&self) -> Result<u64> { ElucidatorError::new_narrowing("f32", "u64") }
     fn as_i64(&self) -> Result<i64> { ElucidatorError::new_narrowing("f32", "i64") }
     fn as_f64(&self) -> Result<f64> { Ok(*self as f64) }
+    fn as_string(&self) -> Result<String> {
+        ElucidatorError::new_conversion("f32", "string")
+    }
 }
 
 impl Representable for f64 {
@@ -260,6 +289,9 @@ impl Representable for f64 {
     fn as_u64(&self) -> Result<u64> { ElucidatorError::new_narrowing("f64", "u64") }
     fn as_i64(&self) -> Result<i64> { ElucidatorError::new_narrowing("f64", "i64") }
     fn as_f64(&self) -> Result<f64> { Ok(*self) }
+    fn as_string(&self) -> Result<String> {
+        ElucidatorError::new_conversion("f64", "string")
+    }
 }
 
 impl Representable for String {
@@ -292,6 +324,7 @@ impl Representable for String {
     fn as_u64(&self) -> Result<u64> { ElucidatorError::new_conversion("string", "u64") }
     fn as_i64(&self) -> Result<i64> { ElucidatorError::new_conversion("string", "i64") }
     fn as_f64(&self) -> Result<f64> { ElucidatorError::new_conversion("string", "f64") }
+    fn as_string(&self) -> Result<String> { Ok(self.clone()) }
 }
 
 #[cfg(test)]
@@ -317,6 +350,12 @@ mod tests {
         let to = from.as_f64();
         assert_eq!(to, Ok(from as f64)); 
     }
+    #[test]
+    fn u8_to_string() {
+        let from = u8::MAX / 2;
+        let to = from.as_string();
+        assert_eq!(to, ElucidatorError::new_conversion("u8", "string")); 
+    } 
 
     // u16 -> X
     #[test]
@@ -337,6 +376,12 @@ mod tests {
         let to = from.as_f64();
         assert_eq!(to, Ok(from as f64)); 
     }
+    #[test]
+    fn u16_to_string() {
+        let from = u16::MAX / 2;
+        let to = from.as_string();
+        assert_eq!(to, ElucidatorError::new_conversion("u16", "string")); 
+    } 
 
     // u32 -> X
     #[test]
@@ -356,6 +401,12 @@ mod tests {
         let from = u32::MAX / 2;
         let to = from.as_f64();
         assert_eq!(to, Ok(from as f64)); 
+    } 
+    #[test]
+    fn u32_to_string() {
+        let from = u32::MAX / 2;
+        let to = from.as_string();
+        assert_eq!(to, ElucidatorError::new_conversion("u32", "string")); 
     } 
 
     // u64 -> X
@@ -377,6 +428,12 @@ mod tests {
         let to = from.as_f64();
         assert_eq!(to, ElucidatorError::new_narrowing("u64", "f64")); 
     }
+    #[test]
+    fn u64_to_string() {
+        let from = u64::MAX / 2;
+        let to = from.as_string();
+        assert_eq!(to, ElucidatorError::new_conversion("u64", "string")); 
+    } 
 
     // i8 -> X
     #[test]
@@ -396,6 +453,12 @@ mod tests {
         let from: i8 = -100;
         let to = from.as_f64();
         assert_eq!(to, Ok(from as f64)); 
+    } 
+    #[test]
+    fn i8_to_string() {
+        let from: i8 = -100;
+        let to = from.as_string();
+        assert_eq!(to, ElucidatorError::new_conversion("i8", "string")); 
     } 
 
     // i16 -> X
@@ -417,6 +480,12 @@ mod tests {
         let to = from.as_f64();
         assert_eq!(to, Ok(from as f64)); 
     }
+    #[test]
+    fn i16_to_string() {
+        let from: i16 = -100;
+        let to = from.as_string();
+        assert_eq!(to, ElucidatorError::new_conversion("i16", "string")); 
+    } 
 
     // i32 -> X
     #[test]
@@ -437,6 +506,12 @@ mod tests {
         let to = from.as_f64();
         assert_eq!(to, Ok(from as f64)); 
     }
+    #[test]
+    fn i32_to_string() {
+        let from: i32 = -100;
+        let to = from.as_string();
+        assert_eq!(to, ElucidatorError::new_conversion("i32", "string")); 
+    } 
 
     // i64 -> X
     #[test]
@@ -456,6 +531,12 @@ mod tests {
         let from: i64 = -100;
         let to = from.as_f64();
         assert_eq!(to, ElucidatorError::new_narrowing("i64", "f64")); 
+    } 
+    #[test]
+    fn i64_to_string() {
+        let from: i64 = -100;
+        let to = from.as_string();
+        assert_eq!(to, ElucidatorError::new_conversion("i64", "string")); 
     } 
 
     // f32 -> X
@@ -477,6 +558,12 @@ mod tests {
         let to = from.as_f64();
         assert_eq!(to, Ok(from as f64)); 
     } 
+    #[test]
+    fn f32_to_string() {
+        let from: f32 = 0.0;
+        let to = from.as_string();
+        assert_eq!(to, ElucidatorError::new_conversion("f32", "string")); 
+    } 
 
     // f64 -> X
     #[test]
@@ -497,6 +584,12 @@ mod tests {
         let to = from.as_f64();
         assert_eq!(to, Ok(from as f64)); 
     } 
+    #[test]
+    fn f64_to_string() {
+        let from: f64 = 0.0;
+        let to = from.as_string();
+        assert_eq!(to, ElucidatorError::new_conversion("f64", "string")); 
+    } 
     
     // string -> X
     #[test]
@@ -516,4 +609,10 @@ mod tests {
         let to = s.as_f64();
         assert_eq!(to, ElucidatorError::new_conversion("string", "f64"));
     }
+    #[test]
+    fn string_to_string() {
+        let s = String::from("sunny day");
+        let to = s.as_string();
+        assert_eq!(Ok(s), to); 
+    } 
 }
