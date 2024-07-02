@@ -1,4 +1,5 @@
 //! Main elucidator library.
+use std::collections::HashSet;
 
 use crate::error::*;
 pub use representable::Representable;
@@ -15,16 +16,16 @@ pub mod representable;
 /// // Fixed Sizing of 10
 /// let fixed_size = Sizing::Fixed(10 as u64);
 /// // Dynamic Sizing based on the identifier "len"
-/// let dynamic_size = Sizing::Dynamic("len".to_string());
+/// let dynamic_size = Sizing::Dynamic;
 /// assert_eq!(fixed_size, Sizing::Fixed(10));
-/// assert_eq!(dynamic_size, Sizing::Dynamic("len".to_string()));
+/// assert_eq!(dynamic_size, Sizing::Dynamic);
 /// ```
 #[derive(Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Sizing {
     Singleton,
     Fixed(u64),
-    Dynamic(String),
+    Dynamic,
 }
 
 /// Possible Data Types allowed in The Elucidation Metadata Standard, most composable as arrays.
@@ -188,7 +189,7 @@ fn ascii_trimmed_or_err(s: &str) -> Result<&str, ElucidatorError> {
 }
 
 fn is_valid_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '_' || c == '[' || c == ']'
+    c.is_alphanumeric() || c == '_' || c == '[' || c == ']' ||  c.is_whitespace()
 }
 
 fn validated_trimmed_or_err(s: &str) -> Result<&str, ElucidatorError> {
@@ -209,6 +210,19 @@ fn validated_trimmed_or_err(s: &str) -> Result<&str, ElucidatorError> {
 
 fn validate_identifier(s: &str) -> Result<&str, ElucidatorError> {
     let ss = validated_trimmed_or_err(s)?;
+    if ss.chars().any(|c| c.is_whitespace()) {
+        let mut illegal_chars: Vec<char> = ss.chars()
+            .filter(|c| c.is_whitespace())
+            .collect::<HashSet<char>>()
+            .into_iter()
+            .collect();
+        illegal_chars.sort();
+        Err(
+            ElucidatorError::Parsing {
+                offender: s.to_string(),
+                reason: ParsingFailure::IllegalCharacters(illegal_chars)
+        })?
+    }
     match ss.chars().nth(0) {
         Some(c) => {
             if !c.is_alphabetic() {
@@ -227,7 +241,6 @@ fn validate_identifier(s: &str) -> Result<&str, ElucidatorError> {
     Ok(ss)
 }
 
-/// Full specification for any type
 #[derive(Debug, PartialEq)]
 pub struct TypeSpecification {
     dtype: Dtype,
@@ -236,23 +249,27 @@ pub struct TypeSpecification {
 
 impl TypeSpecification {
     pub fn from(s: &str) -> Result<TypeSpecification, ElucidatorError> {
-        let ss = validated_trimmed_or_err(s)?;
-        match ss.find("[") {
+        let type_spec = validated_trimmed_or_err(s)?;
+        match type_spec.find("[") {
             Some(lbracket_index) => {
-                if ss.chars().last().unwrap() == ']' {
-                    let end_index = ss.len() - 1;
-                    let inside = &ss[(lbracket_index + 1)..end_index];
+                if type_spec.chars().last().unwrap() == ']' {
+                    let end_index = type_spec.len() - 1;
+                    let inside = &type_spec[(lbracket_index + 1)..end_index];
                     if inside.parse::<u64>().is_ok() {
                         Ok ( Self { 
-                            dtype: Dtype::from(&ss[0..lbracket_index])?,
+                            dtype: Dtype::from(&type_spec[0..lbracket_index])?,
                             sizing: Sizing::Fixed(inside.parse::<u64>().unwrap()),
                         })
-                    } else {
-                        Ok ( Self {
-                            dtype: Dtype::from(&ss[0..lbracket_index])?,
-                            sizing: Sizing::Dynamic(
-                                validate_identifier(inside)?.to_string()
-                            ),
+                    } else if inside.chars().all(|c| c.is_whitespace()) {
+                        Ok( Self {
+                            dtype: Dtype::from(&type_spec[0..lbracket_index])?,
+                            sizing: Sizing::Dynamic
+                        })
+                    }
+                    else {
+                        Err(ElucidatorError::Parsing {
+                            offender: s.to_string(),
+                            reason: ParsingFailure::IllegalArraySizing
                         })
                     }
                 } else {
@@ -263,7 +280,7 @@ impl TypeSpecification {
                 }
             },
             None => {
-                Ok( Self { dtype: Dtype::from(ss)?, sizing: Sizing::Singleton } )
+                Ok( Self { dtype: Dtype::from(type_spec)?, sizing: Sizing::Singleton } )
             },
         }
     }
@@ -559,13 +576,24 @@ mod tests {
         );
     }
     #[test]
-    fn typespec_gets_dynamic() {
-        let ts = "u32[cat]";
+    fn typespec_gets_dynamic_empty() {
+        let ts = "u32[]";
         assert_eq!(
             TypeSpecification::from(ts),
             Ok( TypeSpecification {
                 dtype: Dtype::UnsignedInteger32,
-                sizing: Sizing::Dynamic("cat".to_string()),
+                sizing: Sizing::Dynamic,
+            })
+        );
+    }
+    #[test]
+    fn typespec_gets_dynamic_whitespace() {
+        let ts = "u32[     ]";
+        assert_eq!(
+            TypeSpecification::from(ts),
+            Ok( TypeSpecification {
+                dtype: Dtype::UnsignedInteger32,
+                sizing: Sizing::Dynamic,
             })
         );
     }
@@ -598,7 +626,8 @@ mod tests {
     }
     #[test]
     fn memberspec_invalid_identifier_char() {
-        let illegal_chars = vec!['{', '}', ' ', '?'];
+        let mut illegal_chars = vec!['{', '}', '?'];
+        illegal_chars.sort();
         let invalid_ident: String = illegal_chars.iter().collect();
         assert_eq!(
             MemberSpecification::from(&format!("{invalid_ident}: u32")),

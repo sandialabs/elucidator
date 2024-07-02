@@ -73,25 +73,25 @@ Compliant implementations must implement all data types.
 
 All Data Types which are not `String` may be constructed as an `Array`.
 An `Array` may be of fixed size in the `Member Specification`, or of dynamic size.
-Dynamically sized arrays must be sized based off of the size of a previously occurring member with an unsigned integer.
+
 NOTE: signed integers used for dynamic sizing are NOT compliant with The Standard.
+
 Arrays are specified using the following grammar for fixed size:
 ```
 Dtype[literal]
 ```
 and the following grammar for dynamic size:
 ```
-Dtype[identifier]
+Dtype[]
 ```
-Some users may wish to have an array be sized very arbitrarily.
-The Standard discourages this; however, for compelling use cases, it is recommended to simply prepend a member which specifies the size of an upcoming array, and fill in this member with the array size just before writing the array.
 
 #### Byte Representation
 
 For all types, little endian byte ordering is required.
 The `String` type consists of one unsigned 64-bit integer, followed by that number of bytes to represent the string.
 NOTE: The `String` type is NOT nul-terminated.
-For arrays, the underlying data type is repeated for the size of the array with no padding.
+For fixed arrays, the underlying data type is repeated for the size of the array with no padding.
+For dynamic arrays, like `String`s, the array begins with one unsigned 64-bit integer, followed by that number of elements of the designated type in byte representation.
 
 ## Elucidator
 
