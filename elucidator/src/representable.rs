@@ -9,18 +9,19 @@ type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
 /// safely be converted. Columns indicate the source type, rows indicate the target type, and "x"
 /// indicates that the conversion can be performed.
 ///
-/// |        | string | u8 | u16 | u32 | u64 | i16 | i32 | i64 | f32 | f64 |
-/// |--------|--------|----|-----|-----|-----|-----|-----|-----|-----|-----|
-/// | string | x      |    |     |     |     |     |     |     |     |     |
-/// | u8     |        | x  |     |     |     |     |     |     |     |     |
-/// | u16    |        | x  | x   |     |     |     |     |     |     |     |
-/// | u32    |        | x  | x   | x   |     |     |     |     |     |     |
-/// | u64    |        | x  | x   | x   | x   |     |     |     |     |     |
-/// | i16    |        | x  |     |     |     | x   |     |     |     |     |
-/// | i32    |        | x  | x   |     |     | x   | x   |     |     |     |
-/// | i64    |        | x  | x   | x   |     | x   | x   | x   |     |     |
-/// | f32    |        | x  | x   |     |     | x   |     |     |     |     |
-/// | f64    |        | x  | x   | x   |     | x   | x   |     | x   | x   |
+/// |        | string | u8 | u16 | u32 | u64 | i8  | i16 | i32 | i64 | f32 | f64 |
+/// |--------|--------|----|-----|-----|-----|-----|-----|-----|-----|-----|-----|
+/// | string | x      |    |     |     |     |     |     |     |     |     |     |
+/// | u8     |        | x  |     |     |     |     |     |     |     |     |     |
+/// | u16    |        | x  | x   |     |     |     |     |     |     |     |     |
+/// | u32    |        | x  | x   | x   |     |     |     |     |     |     |     |
+/// | u64    |        | x  | x   | x   | x   |     |     |     |     |     |     |
+/// | i8     |        |    |     |     |     | x   |     |     |     |     |     |
+/// | i16    |        | x  |     |     |     | x   | x   |     |     |     |     |
+/// | i32    |        | x  | x   |     |     | x   | x   | x   |     |     |     |
+/// | i64    |        | x  | x   | x   |     | x   | x   | x   | x   |     |     |
+/// | f32    |        | x  | x   |     |     | x   | x   |     |     | x   |     |
+/// | f64    |        | x  | x   | x   |     | x   | x   | x   |     | x   | x   |
 /// 
 /// # Examples
 /// 
@@ -115,6 +116,7 @@ pub trait Representable {
     fn is_array(&self) -> bool;
     /// Return the Dtype of this object
     fn get_dtype(&self) -> Dtype;
+    /// Determine whether this type is signed
     fn is_signed(&self) -> bool;
     /// Determine whether this type is an integer
     fn is_integer(&self) -> bool;
