@@ -30,6 +30,30 @@ From here on, "The Standard" is an abbreviation of "The Elucidation Metadata Sta
 - `Member Specification` defines the association of some `Identifier` with a `Data Type` for a particular `Member`.
 - `Array` is an ordered set of values with homogeneous `Data Type`.
 
+
+### Nomenclature Diagram
+
+```
+Group
+├── Metadata Specification 
+│   ├── Designation 
+│   ├── Member 0
+│   │   ├── Identifier
+│   │   └── Data Type
+│   ├── Member 1
+│   │   ├── Identifier
+│   │   └── Data Type
+│   ├── ...
+│   └── Member n 
+│       ├── Identifier
+│       └── Data Type
+├── Metadata Specification
+│   └── ...
+├── ...
+└── Metadata Specification
+    └── ...
+```
+
 ### The Standard
 
 #### Metadata Specification
