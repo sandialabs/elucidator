@@ -3,8 +3,6 @@
 members = [
     "elucidator",
     "elucidator-db",
-    "pyelucidator",
-    "elucidatorc",
     "elucitools",
     "elucidator_macros",
 ]
