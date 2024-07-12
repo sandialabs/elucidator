@@ -75,61 +75,61 @@ impl Dtype {
             Self::Byte => {
                 let buffer_len = buff_size_or_err::<u8>(buffer)?;
                 Ok(Box::new(u8::from_le_bytes(
-                    buffer.iter().take(buffer_len).map(|x| *x).collect::<Vec<u8>>().try_into().unwrap()
+                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::UnsignedInteger16 => {
                 let buffer_len = buff_size_or_err::<u16>(buffer)?;
                 Ok(Box::new(u16::from_le_bytes(
-                    buffer.iter().take(buffer_len).map(|x| *x).collect::<Vec<u8>>().try_into().unwrap()
+                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::UnsignedInteger32 => {
                 let buffer_len = buff_size_or_err::<u32>(buffer)?;
                 Ok(Box::new(u32::from_le_bytes(
-                    buffer.iter().take(buffer_len).map(|x| *x).collect::<Vec<u8>>().try_into().unwrap()
+                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::UnsignedInteger64 => {
                 let buffer_len = buff_size_or_err::<u64>(buffer)?;
                 Ok(Box::new(u64::from_le_bytes(
-                    buffer.iter().take(buffer_len).map(|x| *x).collect::<Vec<u8>>().try_into().unwrap()
+                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::SignedInteger8 => {
                 let buffer_len = buff_size_or_err::<i8>(buffer)?;
                 Ok(Box::new(i8::from_le_bytes(
-                    buffer.iter().take(buffer_len).map(|x| *x).collect::<Vec<u8>>().try_into().unwrap()
+                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::SignedInteger16 => {
                 let buffer_len = buff_size_or_err::<i16>(buffer)?;
                 Ok(Box::new(i16::from_le_bytes(
-                    buffer.iter().take(buffer_len).map(|x| *x).collect::<Vec<u8>>().try_into().unwrap()
+                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::SignedInteger32 => {
                 let buffer_len = buff_size_or_err::<i32>(buffer)?;
                 Ok(Box::new(i32::from_le_bytes(
-                    buffer.iter().take(buffer_len).map(|x| *x).collect::<Vec<u8>>().try_into().unwrap()
+                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::SignedInteger64 => {
                 let buffer_len = buff_size_or_err::<i64>(buffer)?;
                 Ok(Box::new(i64::from_le_bytes(
-                    buffer.iter().take(buffer_len).map(|x| *x).collect::<Vec<u8>>().try_into().unwrap()
+                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::Float32 => {
                 let buffer_len = buff_size_or_err::<f32>(buffer)?;
                 Ok(Box::new(f32::from_le_bytes(
-                    buffer.iter().take(buffer_len).map(|x| *x).collect::<Vec<u8>>().try_into().unwrap()
+                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::Float64 => {
                 let buffer_len = buff_size_or_err::<f64>(buffer)?;
                 Ok(Box::new(f64::from_le_bytes(
-                    buffer.iter().take(buffer_len).map(|x| *x).collect::<Vec<u8>>().try_into().unwrap()
+                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::Str => {
@@ -137,7 +137,7 @@ impl Dtype {
                 if buffer_len < 8 {
                     Err(ElucidatorError::BufferSizing { expected: 8, found: buffer_len })?
                 }
-                let string_length_buffer = buffer.iter().take(8).map(|x| *x).collect::<Vec<u8>>();
+                let string_length_buffer = buffer.iter().take(8).copied().collect::<Vec<u8>>();
                 let dt = Dtype::UnsignedInteger64;
                 let string_length = dt.from_buffer(&string_length_buffer).unwrap().as_u64().unwrap() as usize;
 
@@ -147,7 +147,7 @@ impl Dtype {
                     Err(ElucidatorError::BufferSizing { expected: expected_buffer_len, found: buffer_len })?
                 }
                 let s = String::from_utf8(
-                    buffer[8..].iter().map(|x| *x).collect()
+                    buffer[8..].to_vec()
                 );
                 match s {
                     Ok(o) => { Ok(Box::new(o)) }
@@ -198,7 +198,7 @@ fn validated_trimmed_or_err(s: &str) -> Result<&str, ElucidatorError> {
         .chars()
         .filter(|c| !is_valid_char(*c))
         .collect::<Vec<char>>();
-    if illegal_chars.len() == 0 {
+    if illegal_chars.is_empty() {
         Ok(trimmed)
     } else {
         Err(ElucidatorError::Parsing{
@@ -223,7 +223,7 @@ fn validate_identifier(s: &str) -> Result<&str, ElucidatorError> {
                 reason: ParsingFailure::IllegalCharacters(illegal_chars)
         })?
     }
-    match ss.chars().nth(0) {
+    match ss.chars().next() {
         Some(c) => {
             if !c.is_alphabetic() {
                 Err(
@@ -250,9 +250,9 @@ pub struct TypeSpecification {
 impl TypeSpecification {
     pub fn from(s: &str) -> Result<TypeSpecification, ElucidatorError> {
         let type_spec = validated_trimmed_or_err(s)?;
-        match type_spec.find("[") {
+        match type_spec.find('[') {
             Some(lbracket_index) => {
-                if type_spec.chars().last().unwrap() == ']' {
+                if type_spec.ends_with(']') {
                     let end_index = type_spec.len() - 1;
                     let inside = &type_spec[(lbracket_index + 1)..end_index];
                     if inside.parse::<u64>().is_ok() {
@@ -295,7 +295,7 @@ pub struct MemberSpecification {
 impl MemberSpecification {
     pub fn from(s: &str) -> Result<MemberSpecification, ElucidatorError> {
         let ss = ascii_trimmed_or_err(s)?;
-        if let Some((ident, typespec)) = ss.split_once(":") {
+        if let Some((ident, typespec)) = ss.split_once(':') {
             validate_identifier(ident)?;
             let ts = TypeSpecification::from(typespec)?;
             Ok(
@@ -571,7 +571,7 @@ mod tests {
             TypeSpecification::from(ts),
             Ok( TypeSpecification {
                 dtype: Dtype::UnsignedInteger32,
-                sizing: Sizing::Fixed(10 as u64),
+                sizing: Sizing::Fixed(10_u64),
             })
         );
     }
