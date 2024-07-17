@@ -1,5 +1,5 @@
 use crate::error::*;
-use crate::Dtype;
+use crate::member::Dtype;
 use elucidator_macros::representable_primitive_impl;
 
 type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
@@ -60,7 +60,7 @@ type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
 /// ```
 /// # use elucidator::Representable;
 /// # let datum: Box<dyn Representable> = Box::new(0 as u8);
-/// use elucidator::Dtype;
+/// use elucidator::member::Dtype;
 ///
 /// let datum: Box<dyn Representable> = Box::new(0.0 as f64);
 /// let extracted_val = match datum.get_dtype() {
@@ -95,7 +95,7 @@ type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
 /// #   Box::new(4.5 as f64),
 /// #   Box::new(5.4 as f64),
 /// # ];
-/// use elucidator::Dtype;
+/// use elucidator::member::Dtype;
 ///
 /// let floats: Vec<f64> = unknown_types.iter()
 ///     .filter(|x| x.get_dtype() == Dtype::Float64)
