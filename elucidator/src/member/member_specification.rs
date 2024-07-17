@@ -10,6 +10,14 @@ pub struct MemberSpecification {
 impl MemberSpecification {
     pub fn from(s: &str) -> Result<MemberSpecification, ElucidatorError> {
         let ss = helper::ascii_trimmed_or_err(s)?;
+        if s.is_empty() {
+            Err(
+                ElucidatorError::Parsing{
+                    offender: "".to_string(),
+                    reason: ParsingFailure::UnexpectedEndOfExpression,
+                }
+            )?
+        }
         if let Some((ident, typespec)) = ss.split_once(':') {
             helper::validate_identifier(ident)?;
             let ts = TypeSpecification::from(typespec)?;
@@ -36,7 +44,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn memberspec_non_ascii_str() {
+    fn non_ascii_str_err() {
         let crab_emoji = String::from('\u{1F980}');
         assert_eq!(
             MemberSpecification::from(&crab_emoji),
@@ -50,7 +58,7 @@ mod tests {
 
     }
     #[test]
-    fn memberspec_invalid_identifier_start() {
+    fn invalid_identifier_start_err() {
         let invalid_ident = "5ever";
         assert_eq!(
             MemberSpecification::from(&format!("{invalid_ident}: u32")),
@@ -63,7 +71,7 @@ mod tests {
         );
     }
     #[test]
-    fn memberspec_invalid_identifier_char() {
+    fn invalid_identifier_char_err() {
         let mut illegal_chars = vec!['{', '}', '?'];
         illegal_chars.sort();
         let invalid_ident: String = illegal_chars.iter().collect();
@@ -73,6 +81,32 @@ mod tests {
                 ElucidatorError::Parsing {
                     offender: invalid_ident.to_string(),
                     reason: ParsingFailure::IllegalCharacters(illegal_chars),
+                }
+            )
+        );
+    }
+    #[test]
+    fn empty_err() {
+        let spec = "";
+        assert_eq!(
+            MemberSpecification::from(""),
+            Err(
+                ElucidatorError::Parsing {
+                    offender: spec.to_string(),
+                    reason: ParsingFailure::UnexpectedEndOfExpression,
+                }
+            )
+        );
+    }
+    #[test]
+    fn ok() {
+        let spec = "foo: i32";
+        assert_eq!(
+            MemberSpecification::from(spec),
+            Ok(
+                MemberSpecification {
+                    identifier: "foo".to_string(),
+                    typespec: TypeSpecification::from("i32").unwrap(),
                 }
             )
         );

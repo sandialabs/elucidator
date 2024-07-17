@@ -4,9 +4,8 @@ use crate::{
     member::MemberSpecification,
 };
 
-type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
 
-//! Facilities for ingesting metadata specifications
+type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
 
 /// Representation of a Metadata Specification. The designation is the identifier associated with
 /// an ordered set of member specifications. This represents only the specification; an Interpreter
@@ -22,40 +21,53 @@ impl MetadataSpecification {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-// 
-//     mod designation {
-//         #[test]
-//         fn not_ascii_err() {
-//             todo!();
-//         }
-//         #[test]
-//         fn non_alphabetical_start_err() {
-//             todo!();
-//         }
-//         #[test]
-//         fn contains_illegal_chars_err() {
-//             todo!();
-//         }
-//         #[test]
-//         fn is_ok() {
-//             todo!();
-//         }
-//     }
-// 
-//     mod spec_test {
-//         #[test]
-//         fn not_ascii_err() {
-//             todo!();
-//         }
-//         #[test]
-//         fn contains_illegal_chars_err() {
-//             todo!()
-//         }
-//         #[test]
-//         fn member_repeated_err() {
-//             todo!()
-//         }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod designation {
+        #[test]
+        fn not_ascii_err() {
+            todo!();
+        }
+        #[test]
+        fn non_alphabetical_start_err() {
+            todo!();
+        }
+        #[test]
+        fn contains_illegal_chars_err() {
+            todo!();
+        }
+        #[test]
+        fn is_ok() {
+            todo!();
+        }
+    }
+
+    mod spec_text {
+        #[test]
+        fn not_ascii_err() {
+            todo!();
+        }
+        #[test]
+        fn contains_illegal_chars_err() {
+            todo!();
+        }
+        #[test]
+        fn member_repeated_err() {
+            todo!();
+        }
+        #[test]
+        fn invalid_dtype_err() {
+            todo!();
+        }
+        #[test]
+        fn multiple_failures_err() {
+            todo!();
+        }
+        #[test]
+        fn unexpected_eoe_after_delimeter() {
+            todo!();
+        }
+    }
+}

@@ -1,7 +1,6 @@
 use std::{fmt, string::FromUtf8Error};
 
 #[derive(Debug, PartialEq)]
-#[warn(dead_code)]
 pub enum ElucidatorError {
     /// Errors related to parsing strings, see [`ParsingFailure`] for reasons parsing might fail
     Parsing{offender: String, reason: ParsingFailure},
@@ -68,7 +67,6 @@ impl fmt::Display for ElucidatorError {
 }
 
 #[derive(Debug, PartialEq)]
-#[warn(dead_code)]
 pub enum ParsingFailure {
     NonAsciiEncoding,
     IllegalCharacters(Vec<char>),
@@ -104,7 +102,6 @@ impl fmt::Display for ParsingFailure {
 }
 
 #[derive(Debug, PartialEq)]
-#[warn(dead_code)]
 pub enum SpecificationFailure {
     RepeatedIdentifier,
     IdentifierStartsNonAlphabetical,
