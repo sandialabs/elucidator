@@ -67,9 +67,9 @@ pub(crate) fn validate_identifier(s: &str) -> Result<&str, ElucidatorError> {
         Some(c) => {
             if !c.is_alphabetic() {
                 Err(
-                    ElucidatorError::Parsing{
+                    ElucidatorError::IllegalSpecification{
                         offender: s.to_string(),
-                        reason: ParsingFailure::IdentifierStartsNonAlphabetical,
+                        reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                     }
                 )?;
             }

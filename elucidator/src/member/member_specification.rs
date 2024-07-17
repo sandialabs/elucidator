@@ -55,9 +55,9 @@ mod tests {
         assert_eq!(
             MemberSpecification::from(&format!("{invalid_ident}: u32")),
             Err(
-                ElucidatorError::Parsing {
+                ElucidatorError::IllegalSpecification {
                     offender: invalid_ident.to_string(),
-                    reason: ParsingFailure::IdentifierStartsNonAlphabetical,
+                    reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                 }
             )
         );

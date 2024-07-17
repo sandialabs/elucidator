@@ -1,6 +1,7 @@
 use std::{fmt, string::FromUtf8Error};
 
 #[derive(Debug, PartialEq)]
+#[warn(dead_code)]
 pub enum ElucidatorError {
     /// Errors related to parsing strings, see [`ParsingFailure`] for reasons parsing might fail
     Parsing{offender: String, reason: ParsingFailure},
@@ -67,11 +68,10 @@ impl fmt::Display for ElucidatorError {
 }
 
 #[derive(Debug, PartialEq)]
+#[warn(dead_code)]
 pub enum ParsingFailure {
     NonAsciiEncoding,
-    IdentifierStartsNonAlphabetical,
     IllegalCharacters(Vec<char>),
-    IllegalDataType,
     MissingIdSpecDelimiter,
     UnexpectedEndOfExpression,
     IllegalArraySizing,
@@ -81,9 +81,6 @@ impl fmt::Display for ParsingFailure {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let m = match self {
             Self::NonAsciiEncoding => { "Non ASCII encoding".to_string() },
-            Self::IdentifierStartsNonAlphabetical => {
-                "Identifiers must begin with an alphabetical character".to_string()
-            },
             Self::IllegalCharacters(clist) => {
                 let offending_list = clist
                     .iter()
@@ -92,7 +89,6 @@ impl fmt::Display for ParsingFailure {
                     .join(", ");
                 format!("Illegal characters encountered: {offending_list}")
             },
-            Self::IllegalDataType => { "Illegal data type".to_string() },
             Self::MissingIdSpecDelimiter => {
                 "Missing delimeter : between identifier and type specification".to_string()
             },
@@ -108,16 +104,23 @@ impl fmt::Display for ParsingFailure {
 }
 
 #[derive(Debug, PartialEq)]
+#[warn(dead_code)]
 pub enum SpecificationFailure {
-    RepeatedIdentifier{identifier: String},
+    RepeatedIdentifier,
+    IdentifierStartsNonAlphabetical,
+    IllegalDataType,
 }
 
 impl fmt::Display for SpecificationFailure {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let m = match self {
-            Self::RepeatedIdentifier{identifier} => {
-                format!("Repeated identifier: {identifier}")
+            Self::RepeatedIdentifier => {
+                format!("Identifier is repeated, causing a naming collision")
             },
+            Self::IdentifierStartsNonAlphabetical => {
+                format!("Identifiers must start with alphabetical character")
+            },
+            Self::IllegalDataType => { "Illegal data type".to_string() },
         };
         write!(f, "{m}")
     }

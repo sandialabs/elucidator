@@ -35,9 +35,9 @@ impl Dtype {
             "string" => Self::Str,
             ss => {
                 Err(
-                    ElucidatorError::Parsing{
+                    ElucidatorError::IllegalSpecification{
                         offender: ss.to_string(),
-                        reason: ParsingFailure::IllegalDataType,
+                        reason: SpecificationFailure::IllegalDataType,
                     }
                 )?
             },
@@ -311,9 +311,9 @@ mod tests {
         assert_eq!(
             Dtype::from(invalid_dtype),
             Err(
-                ElucidatorError::Parsing {
+                ElucidatorError::IllegalSpecification{
                     offender: invalid_dtype.to_string(),
-                    reason: ParsingFailure::IllegalDataType,
+                    reason: SpecificationFailure::IllegalDataType,
                 }
             )
         );
