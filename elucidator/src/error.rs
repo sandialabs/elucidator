@@ -11,10 +11,12 @@ pub enum ElucidatorError {
     /// Errors related to interpreting a dtype from a given buffer
     BufferSizing{expected: usize, found: usize},
     /// Errors when parsing from UTF8
-    FromUtf8{source: FromUtf8Error}
+    FromUtf8{source: FromUtf8Error},
+    /// Errors related to illegal specification
+    IllegalSpecification{offender: String, reason: SpecificationFailure},
+    /// Multiple errors have occurred
+    MultipleFailure(Box<Vec<ElucidatorError>>),
 }
-
-
 
 impl ElucidatorError {
     pub fn new_conversion<T>(from: &str, to: &str) -> Result<T, ElucidatorError> {
@@ -43,12 +45,22 @@ impl fmt::Display for ElucidatorError {
             Self::Narrowing{from, to} => {
                 format!("Conversion from {from} to {to} would cause narrowing")
             },
-            Self::BufferSizing { expected, found } => {
+            Self::BufferSizing{expected, found} => {
                 format!("Buffer expected size of {expected} bytes, found {found} instead")
             },
-            Self::FromUtf8 { source } => {
+            Self::FromUtf8{source} => {
                 format!("{source}")
-            }
+            },
+            Self::IllegalSpecification{offender, reason} => {
+                format!("Illegal specification \"{offender}\": {reason}")
+            },
+            Self::MultipleFailure(errors) => {
+                let error_text = errors.iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\n");
+                format!("Multiple errors occurred:\n{error_text}")
+            },
         };
         write!(f, "{m}")
     }
@@ -90,6 +102,22 @@ impl fmt::Display for ParsingFailure {
             Self::IllegalArraySizing => {
                 "The size of the array is not valid; valid sizes must be unsigned integers or empty".to_string()
             }
+        };
+        write!(f, "{m}")
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum SpecificationFailure {
+    RepeatedIdentifier{identifier: String},
+}
+
+impl fmt::Display for SpecificationFailure {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let m = match self {
+            Self::RepeatedIdentifier{identifier} => {
+                format!("Repeated identifier: {identifier}")
+            },
         };
         write!(f, "{m}")
     }
