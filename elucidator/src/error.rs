@@ -1,6 +1,6 @@
 use std::{fmt, string::FromUtf8Error};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ElucidatorError {
     /// Errors related to parsing strings, see [`ParsingFailure`] for reasons parsing might fail
     Parsing{offender: String, reason: ParsingFailure},
@@ -15,7 +15,7 @@ pub enum ElucidatorError {
     /// Errors related to illegal specification
     IllegalSpecification{offender: String, reason: SpecificationFailure},
     /// Multiple errors have occurred
-    MultipleFailure(Box<Vec<ElucidatorError>>),
+    MultipleFailures(Box<Vec<ElucidatorError>>),
 }
 
 impl ElucidatorError {
@@ -54,7 +54,7 @@ impl fmt::Display for ElucidatorError {
             Self::IllegalSpecification{offender, reason} => {
                 format!("Illegal specification \"{offender}\": {reason}")
             },
-            Self::MultipleFailure(errors) => {
+            Self::MultipleFailures(errors) => {
                 let error_text = errors.iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
@@ -66,7 +66,7 @@ impl fmt::Display for ElucidatorError {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ParsingFailure {
     NonAsciiEncoding,
     IllegalCharacters(Vec<char>),
@@ -101,11 +101,12 @@ impl fmt::Display for ParsingFailure {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SpecificationFailure {
     RepeatedIdentifier,
     IdentifierStartsNonAlphabetical,
     IllegalDataType,
+    ZeroLengthIdentifier,
 }
 
 impl fmt::Display for SpecificationFailure {
@@ -118,6 +119,9 @@ impl fmt::Display for SpecificationFailure {
                 format!("Identifiers must start with alphabetical character")
             },
             Self::IllegalDataType => { "Illegal data type".to_string() },
+            Self::ZeroLengthIdentifier => { 
+                format!("Identifiers must have non-zero length")
+            }
         };
         write!(f, "{m}")
     }

@@ -1,5 +1,5 @@
 use crate::error::*;
-use crate::helper;
+use crate::parsing;
 use crate::Representable;
 
 /// Possible Data Types allowed in The Elucidation Metadata Standard, most composable as arrays.
@@ -19,9 +19,17 @@ pub enum Dtype {
     Str,
 }
 
+fn buff_size_or_err<T>(buffer: &[u8]) -> Result<usize, ElucidatorError> {
+    let expected_buff_size = std::mem::size_of::<T>();
+    if buffer.len() != expected_buff_size {
+        Err(ElucidatorError::BufferSizing { expected: expected_buff_size, found: buffer.len() })?
+    }
+    Ok(expected_buff_size)
+}
+
 impl Dtype {
     pub fn from(s: &str) -> Result<Dtype, ElucidatorError> {
-        let dt = match helper::ascii_trimmed_or_err(s)? {
+        let dt = match parsing::ascii_trimmed_or_err(s)? {
             "u8" => Self::Byte,
             "u16" => Self::UnsignedInteger16,
             "u32" => Self::UnsignedInteger32,
@@ -47,61 +55,61 @@ impl Dtype {
     pub fn from_buffer(&self, buffer: &[u8]) -> Result<Box<dyn Representable>, ElucidatorError> {
         match self {
             Self::Byte => {
-                let buffer_len = helper::buff_size_or_err::<u8>(buffer)?;
+                let buffer_len = buff_size_or_err::<u8>(buffer)?;
                 Ok(Box::new(u8::from_le_bytes(
                     buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::UnsignedInteger16 => {
-                let buffer_len = helper::buff_size_or_err::<u16>(buffer)?;
+                let buffer_len = buff_size_or_err::<u16>(buffer)?;
                 Ok(Box::new(u16::from_le_bytes(
                     buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::UnsignedInteger32 => {
-                let buffer_len = helper::buff_size_or_err::<u32>(buffer)?;
+                let buffer_len = buff_size_or_err::<u32>(buffer)?;
                 Ok(Box::new(u32::from_le_bytes(
                     buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::UnsignedInteger64 => {
-                let buffer_len = helper::buff_size_or_err::<u64>(buffer)?;
+                let buffer_len = buff_size_or_err::<u64>(buffer)?;
                 Ok(Box::new(u64::from_le_bytes(
                     buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::SignedInteger8 => {
-                let buffer_len = helper::buff_size_or_err::<i8>(buffer)?;
+                let buffer_len = buff_size_or_err::<i8>(buffer)?;
                 Ok(Box::new(i8::from_le_bytes(
                     buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::SignedInteger16 => {
-                let buffer_len = helper::buff_size_or_err::<i16>(buffer)?;
+                let buffer_len = buff_size_or_err::<i16>(buffer)?;
                 Ok(Box::new(i16::from_le_bytes(
                     buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::SignedInteger32 => {
-                let buffer_len = helper::buff_size_or_err::<i32>(buffer)?;
+                let buffer_len = buff_size_or_err::<i32>(buffer)?;
                 Ok(Box::new(i32::from_le_bytes(
                     buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::SignedInteger64 => {
-                let buffer_len = helper::buff_size_or_err::<i64>(buffer)?;
+                let buffer_len = buff_size_or_err::<i64>(buffer)?;
                 Ok(Box::new(i64::from_le_bytes(
                     buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::Float32 => {
-                let buffer_len = helper::buff_size_or_err::<f32>(buffer)?;
+                let buffer_len = buff_size_or_err::<f32>(buffer)?;
                 Ok(Box::new(f32::from_le_bytes(
                     buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))
             },
             Self::Float64 => {
-                let buffer_len = helper::buff_size_or_err::<f64>(buffer)?;
+                let buffer_len = buff_size_or_err::<f64>(buffer)?;
                 Ok(Box::new(f64::from_le_bytes(
                     buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
                 )))

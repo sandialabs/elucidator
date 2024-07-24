@@ -1,6 +1,6 @@
 use crate::error::*;
 use crate::{
-    helper,
+    parsing,
     member::{
         Dtype,
         Sizing
@@ -15,7 +15,7 @@ pub struct TypeSpecification {
 
 impl TypeSpecification {
     pub fn from(s: &str) -> Result<TypeSpecification, ElucidatorError> {
-        let type_spec = helper::validated_trimmed_or_err(s)?;
+        let type_spec = parsing::validated_trimmed_or_err(s)?;
         match type_spec.find('[') {
             Some(lbracket_index) => {
                 if type_spec.ends_with(']') {

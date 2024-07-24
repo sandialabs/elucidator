@@ -1,14 +1,6 @@
 use std::collections::HashSet;
 use crate::error::*;
 
-pub(crate) fn buff_size_or_err<T>(buffer: &[u8]) -> Result<usize, ElucidatorError> {
-    let expected_buff_size = std::mem::size_of::<T>();
-    if buffer.len() != expected_buff_size {
-        Err(ElucidatorError::BufferSizing { expected: expected_buff_size, found: buffer.len() })?
-    }
-    Ok(expected_buff_size)
-}
-
 pub(crate) fn ascii_or_err(s: &str) -> Result<(), ElucidatorError> {
     if !s.is_ascii() {
             Err(
@@ -30,6 +22,10 @@ pub(crate) fn ascii_trimmed_or_err(s: &str) -> Result<&str, ElucidatorError> {
 
 pub(crate) fn is_valid_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_' || c == '[' || c == ']' ||  c.is_whitespace()
+}
+
+pub(crate) fn is_valid_identifier_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
 }
 
 pub(crate) fn validated_trimmed_or_err(s: &str) -> Result<&str, ElucidatorError> {

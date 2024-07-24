@@ -2,7 +2,8 @@
 use crate::error::*;
 pub use representable::Representable;
 
-mod helper;
+mod parsing;
+mod test_utils;
 pub mod error;
 pub mod representable;
 pub mod member;

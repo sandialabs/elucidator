@@ -1,5 +1,5 @@
 use crate::error::*;
-use crate::{helper, member::TypeSpecification};
+use crate::{parsing, member::TypeSpecification};
 
 #[derive(Debug, PartialEq)]
 pub struct MemberSpecification {
@@ -9,7 +9,7 @@ pub struct MemberSpecification {
 
 impl MemberSpecification {
     pub fn from(s: &str) -> Result<MemberSpecification, ElucidatorError> {
-        let ss = helper::ascii_trimmed_or_err(s)?;
+        let ss = parsing::ascii_trimmed_or_err(s)?;
         if s.is_empty() {
             Err(
                 ElucidatorError::Parsing{
@@ -19,7 +19,7 @@ impl MemberSpecification {
             )?
         }
         if let Some((ident, typespec)) = ss.split_once(':') {
-            helper::validate_identifier(ident)?;
+            parsing::validate_identifier(ident)?;
             let ts = TypeSpecification::from(typespec)?;
             Ok(
                 Self {
