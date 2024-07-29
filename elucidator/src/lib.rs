@@ -4,7 +4,9 @@ pub use representable::Representable;
 
 mod parsing;
 mod test_utils;
+mod token;
 pub mod error;
 pub mod representable;
 pub mod member;
 pub mod specification;
+
