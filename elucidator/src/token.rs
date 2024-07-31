@@ -21,8 +21,12 @@ pub(crate) struct TokenData<'a> {
 
 impl<'a> TokenData<'a> {
     pub fn new(data: &'a str, column_start: usize, column_end: usize) -> TokenData {
+        let data_len = data.len();
         assert!(column_start <= column_end, "columns swapped");
-        assert!(data.len() == column_end - column_start, "bad sizing");
+        assert!(
+            data.len() == column_end - column_start,
+            "Bad sizing; start {column_start} end {column_end}, slice len {data_len}, slice {data}"
+        );
         TokenData { data, column_start, column_end }
     }
 }
@@ -38,7 +42,7 @@ pub(crate) struct DtypeToken<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct SizeToken<'a> {
+pub(crate) struct SizingToken<'a> {
     pub data: TokenData<'a>,
 }
 
@@ -51,7 +55,7 @@ pub(crate) struct DelimiterToken<'a> {
 pub(crate) enum Token<'a> {
     Identifier(IdentifierToken<'a>),
     Dtype(DtypeToken<'a>),
-    Size(SizeToken<'a>),
+    Sizing(SizingToken<'a>),
     Delimiter(DelimiterToken<'a>),
 }
 
@@ -60,7 +64,7 @@ impl <'a> Token<'a> {
         match &self {
             Token::Identifier(token) =>  token.data.data,
             Token::Dtype(token) =>  token.data.data,
-            Token::Size(token) =>  token.data.data,
+            Token::Sizing(token) =>  token.data.data,
             Token::Delimiter(token) =>  token.data.data,
         }
     }
@@ -68,7 +72,7 @@ impl <'a> Token<'a> {
         match &self {
             Token::Identifier(token) =>  token.data.column_start,
             Token::Dtype(token) =>  token.data.column_start,
-            Token::Size(token) =>  token.data.column_start,
+            Token::Sizing(token) =>  token.data.column_start,
             Token::Delimiter(token) =>  token.data.column_start,
         }
     }
@@ -76,7 +80,7 @@ impl <'a> Token<'a> {
         match &self {
             Token::Identifier(token) =>  token.data.column_end,
             Token::Dtype(token) =>  token.data.column_end,
-            Token::Size(token) =>  token.data.column_end,
+            Token::Sizing(token) =>  token.data.column_end,
             Token::Delimiter(token) =>  token.data.column_end,
         }
     }

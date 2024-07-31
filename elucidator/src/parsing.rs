@@ -3,8 +3,26 @@ use crate::{error::*, token::*};
 type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
 
 #[derive(Debug, PartialEq)]
+pub(crate) struct WordParserOutput<'a> {
+    word: Option<TokenData<'a>>,
+    errors: Vec<ElucidatorError>,
+}
+
+#[derive(Debug, PartialEq)]
 pub(crate) struct IdentifierParserOutput<'a> {
     identifier: Option<IdentifierToken<'a>>,
+    errors: Vec<ElucidatorError>,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) struct DtypeParserOutput<'a> {
+    dtype: Option<DtypeToken<'a>>,
+    errors: Vec<ElucidatorError>>,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) struct SizeParserOutput<'a> {
+    sizing: Option<SizingToken<'a>>,
     errors: Vec<ElucidatorError>,
 }
 
@@ -12,30 +30,154 @@ pub(crate) struct IdentifierParserOutput<'a> {
 pub(crate) struct MemberSpecParserOutput<'a> {
     identifier: Option<IdentifierToken<'a>>,
     dtype: Option<DtypeToken<'a>>,
-    sizing: Option<SizeToken<'a>>,
+    sizing: Option<SizingToken<'a>>,
     errors: Vec<ElucidatorError>,
 }
 
-pub fn get_identifier<'a>(data: &'a str, start_col: usize) -> IdentifierParserOutput<'a> {
-    let identifier_end = start_col + data.len();
-    let itoken = IdentifierToken {
-        data: TokenData::new(data, start_col, identifier_end),
+pub fn get_identifier<'a>(data: &'a str, start_col: usize) -> IdentifierParserOutput {
+    let word_output = get_word(data, start_col);
+    let identifier = if let Some(word) = word_output.word {
+        Some(IdentifierToken{ data: word })
+    } else {
+        None
     };
+    let errors = word_output.errors;
     IdentifierParserOutput {
-        identifier: Some(itoken),
-        errors: Vec::new(),
+        identifier,
+        errors,
+    }
+}
+
+pub fn get_dtype<'a>(data: &'a str, start_col: usize) -> DtypeParserOutput<'a> {
+    let word_output = get_word(data, start_col);
+    let dtype = if let Some(word) = word_output.word {
+        Some(DtypeToken{ data: word })
+    } else {
+        None
+    };
+    let errors = word_output.errors;
+    DtypeParserOutput {
+        dtype,
+        errors,
+    }
+}
+
+pub fn get_sizing<'a>(data: &'a str, start_col: usize) -> SizingParserOutput<'a> {
+    if data.chars().all(|x| x.is_whitespace()) {
+        let data_len = data.len();
+        let last_slice = data[data_len - 1..data_len - 1];
+        let pos = start_col + data_len;
+        SizingParserOutput {
+            sizing: Tokendata::new(last_slice, pos, pos),
+            errors: Vec::new(),
+        }
+    }
+    else {
+        let wo = get_word(data);
+        let sizing = if let Some(word) = word_output.word {
+            Some(SizingToken{ data: word })
+        } else {
+            None
+        };
+        let errors = word_output.errors;
+        SizingParserOutput {
+            sizing,
+            errors,
+        }
+    }
+}
+
+pub fn get_word<'a>(data: &'a str, start_col: usize) -> WordParserOutput<'a> {
+    let mut word = None;
+    let mut errors = Vec::new();
+    let id_start = data.chars().position(|x| !x.is_whitespace());
+    if id_start.is_none() {
+        errors.push(
+            ElucidatorError::Parsing {
+                offender: data.to_string(),
+                reason: ParsingFailure::UnexpectedEndOfExpression,
+            }
+        );
+    };
+    let id_start = id_start.unwrap();
+    if errors.is_empty() {
+        let id_end = if let Some(pos) = data[id_start..].chars().position(|x| x.is_whitespace()) {
+            pos + id_start
+        } else {
+            data.len()
+        };
+        word = Some(TokenData::new(
+            &data[id_start..id_end],
+            id_start + start_col,
+            id_end + start_col
+        ));
+    }
+
+    WordParserOutput {
+        word,
+        errors,
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct TypeSpecParserOutput<'a> {
+    dtype: Option<DtypeToken<'a>>,
+    sizing: Option<SizingToken<'a>>,
+    errors: Vec<ElucidatorError>,
+}
+
+pub fn get_typespec<'a>(data: &'a str, start_col: usize) -> TypeSpecParserOutput {
+    let mut dtype = None;
+    let mut sizing = None;
+    let mut errors = Vec::new();
+
+    if let Some((dt, contents)) = data.split_once("[") {
+        let lbracket_pos = data.position("[").unwrap();
+        match contents.position("]") {
+            Some(rbracket_pos) => {
+            },
+            None => {
+            }
+        }
+    } else {
+    }
+
+    TypeSpecParserOutput {
+        dtype,
+        sizing,
+        errors,
     }
 }
 
 pub fn get_memberspec<'a>(data: &'a str, start_col: usize) -> MemberSpecParserOutput<'a> {
+    let mut identifier = None;
+    let mut dtype = None;
+    let mut sizing = None;
     let mut errors = Vec::new();
 
-    todo!();
+    if let Some((left_of_colon, right_of_colon)) = data.split_once(":") {
+        let colon_pos = data.chars().position(":").unwrap();
+        // Identifier parsing
+        let ipo = get_identifier(left_of_colon, start_col);
+        identifier = ipo.identifier;
+        for error in &ipo.errors {
+            errors.push(error.clone());
+        }
+        // TypeSpec parsing
+        let tso = get_typespec(right_of_colon, start_col + colon_pos + 1);
+        dtype = tso.dtype;
+        sizing = tso.sizing;
+        for error in &tso.errors {
+            errors.push(error.clone());
+        }
+    } else {
+        // There is no colon; what do?
+    }
 
     MemberSpecParserOutput {
-        identifier: None,
-        dtype: None,
-        sizing: None,
+        identifier,
+        dtype,
+        sizing,
         errors,
     }
 }
@@ -60,7 +202,7 @@ pub fn validated_trimmed_or_err(_: &str) -> Result<&str> {
 // pub(crate) struct MemberSpecParserOutput<'a> {
 //     identifier: Option<IdentifierToken>,
 //     dtype: Option<DtypeToken>,
-//     sizing: Option<SizeToken>,
+//     sizing: Option<SizingToken>,
 // }
 // 
 // impl <'a> MemberSpecParserOutput<'a> {
@@ -73,6 +215,26 @@ mod test {
 
     mod identifier {
         use super::*;
+
+        #[test]
+        fn whitespace_ok() {
+            // 2 front spaces, 3 back spaces
+            let text = "  valid_identifier   ";
+            let output = get_identifier(text, 0);
+            let length_identifier = "valid_identifier".len();
+            let itoken = IdentifierToken{data: TokenData::new(
+                &text[2..(length_identifier + 2)],
+                2,
+                length_identifier + 2,
+            )};
+            assert_eq!(
+                output,
+                IdentifierParserOutput {
+                    identifier: Some(itoken),
+                    errors: Vec::new(),
+                }
+            );
+        }
 
         #[test]
         fn ok() {
@@ -125,7 +287,7 @@ mod test {
                 curr_start = curr_end;
                 curr_end += size.len();
                 size_string = String::from(size);
-                Some(SizeToken {
+                Some(SizingToken {
                     data: TokenData::new(&size_string, curr_start, curr_end)
                 })
             } else { None };
@@ -213,7 +375,7 @@ mod test {
                 curr_start = curr_end;
                 curr_end += size.len();
                 size_string = String::from(size);
-                Some(SizeToken {
+                Some(SizingToken {
                     data: TokenData::new(&size_string, curr_start, curr_end)
                 })
             } else { None };
@@ -226,13 +388,13 @@ mod test {
 
         #[test]
         fn whitespace_property_test() {
-            for _ in (0..500) {
+            for _ in 0..500 {
                 run_ok_whitespace("foo", "u8", None);
             }
-            for _ in (0..500) {
+            for _ in 0..500 {
                 run_ok_whitespace("foo", "u8", Some(""));
             }
-            for _ in (0..500) {
+            for _ in 0..500 {
                 run_ok_whitespace("foo", "u8", Some("1000"));
             }
         }
