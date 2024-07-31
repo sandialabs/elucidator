@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 elucidator_macros = { path = "../elucidator_macros" }
+
+[dev-dependencies]
+rand = "0.8.5"

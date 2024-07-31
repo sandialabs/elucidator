@@ -1,27 +1,53 @@
+/// Store data about a token, including the relevant string slice and its character span, with the
+/// end location being exclusive.
+/// ```ignore
+/// use elucidator::token::TokenData;
+///
+/// let big_slice = "cat: i32, dog: i32";
+///
+/// // extract the token for cat
+/// let td_cat = TokenData::new(big_slice[0..3], 0, 3);
+/// // extract the token for dog
+/// let td_dog = TokenData::new(big_slice[10..13], 10, 13);
+/// # assert_eq!(td_cat.data, "cat");
+/// # assert_eq!(td_dog.data, "dog");
+/// ```
+#[derive(Debug, PartialEq)]
 pub(crate) struct TokenData<'a> {
     data: &'a str,
-    line_start: usize,
-    line_end: usize,
     column_start: usize,
     column_end: usize, 
-} 
+}
 
+impl<'a> TokenData<'a> {
+    pub fn new(data: &'a str, column_start: usize, column_end: usize) -> TokenData {
+        assert!(column_start <= column_end, "columns swapped");
+        assert!(data.len() == column_end - column_start, "bad sizing");
+        TokenData { data, column_start, column_end }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub(crate) struct IdentifierToken<'a> {
-    data: TokenData<'a>,
+    pub data: TokenData<'a>,
 }
 
+#[derive(Debug, PartialEq)]
 pub(crate) struct DtypeToken<'a> {
-    data: TokenData<'a>,
+    pub data: TokenData<'a>,
 }
 
+#[derive(Debug, PartialEq)]
 pub(crate) struct SizeToken<'a> {
-    data: TokenData<'a>,
+    pub data: TokenData<'a>,
 }
 
+#[derive(Debug, PartialEq)]
 pub(crate) struct DelimiterToken<'a> {
-    data: TokenData<'a>,
+    pub data: TokenData<'a>,
 }
 
+#[derive(Debug, PartialEq)]
 pub(crate) enum Token<'a> {
     Identifier(IdentifierToken<'a>),
     Dtype(DtypeToken<'a>),
@@ -36,22 +62,6 @@ impl <'a> Token<'a> {
             Token::Dtype(token) =>  token.data.data,
             Token::Size(token) =>  token.data.data,
             Token::Delimiter(token) =>  token.data.data,
-        }
-    }
-    fn get_line_start(&self) -> usize {
-        match &self {
-            Token::Identifier(token) =>  token.data.line_start,
-            Token::Dtype(token) =>  token.data.line_start,
-            Token::Size(token) =>  token.data.line_start,
-            Token::Delimiter(token) =>  token.data.line_start,
-        }
-    }
-    fn get_line_end(&self) -> usize {
-        match &self {
-            Token::Identifier(token) =>  token.data.line_end,
-            Token::Dtype(token) =>  token.data.line_end,
-            Token::Size(token) =>  token.data.line_end,
-            Token::Delimiter(token) =>  token.data.line_end,
         }
     }
     fn get_column_start(&self) -> usize {
@@ -70,4 +80,37 @@ impl <'a> Token<'a> {
             Token::Delimiter(token) =>  token.data.column_end,
         }
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    #[should_panic(expected = "bad sizing")]
+    fn token_data_new_bad_span_size_err() {
+        let _ = TokenData::new("cat", 0, 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "columns swapped")]
+    fn token_data_new_swapped_cols_err() {
+        let _ = TokenData::new("cat", 2, 0);
+    }
+
+    #[test]
+    fn token_data_new_empty_ok() {
+        let _ = TokenData::new("", 0, 0);
+    }
+
+    #[test]
+    fn token_data_new_one_char_ok() {
+        let _ = TokenData::new("c", 0, 1);
+    }
+
+    #[test]
+    fn token_data_new_ok() {
+        let _ = TokenData::new("cat", 0, 3);
+    }
+
 }
