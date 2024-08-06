@@ -17,15 +17,21 @@ pub(crate) struct IdentifierParserOutput<'a> {
 #[derive(Debug, PartialEq)]
 pub(crate) struct DtypeParserOutput<'a> {
     dtype: Option<DtypeToken<'a>>,
-    errors: Vec<ElucidatorError>>,
-}
-
-#[derive(Debug, PartialEq)]
-pub(crate) struct SizeParserOutput<'a> {
-    sizing: Option<SizingToken<'a>>,
     errors: Vec<ElucidatorError>,
 }
 
+#[derive(Debug, PartialEq)]
+pub(crate) struct SizingParserOutput<'a> {
+    sizing: Option<SizingToken<'a>>,
+    errors: Vec<ElucidatorError>,
+}
+#[derive(Debug, PartialEq)]
+pub(crate) struct TypeSpecParserOutput<'a> {
+    dtype: Option<DtypeToken<'a>>,
+    sizing: Option<SizingToken<'a>>,
+    errors: Vec<ElucidatorError>,
+    is_singleton: bool,
+}
 #[derive(Debug, PartialEq)]
 pub(crate) struct MemberSpecParserOutput<'a> {
     identifier: Option<IdentifierToken<'a>>,
@@ -65,19 +71,22 @@ pub fn get_dtype<'a>(data: &'a str, start_col: usize) -> DtypeParserOutput<'a> {
 pub fn get_sizing<'a>(data: &'a str, start_col: usize) -> SizingParserOutput<'a> {
     if data.chars().all(|x| x.is_whitespace()) {
         let data_len = data.len();
-        let last_slice = data[data_len - 1..data_len - 1];
+        let last_slice = &data[data_len - 1..data_len - 1];
         let pos = start_col + data_len;
+        let stoken = SizingToken {
+            data: TokenData::new(last_slice, pos, pos),
+        };
         SizingParserOutput {
-            sizing: Tokendata::new(last_slice, pos, pos),
+            sizing: Some(stoken),
             errors: Vec::new(),
         }
     }
     else {
-        let wo = get_word(data);
+        let word_output = get_word(data, start_col);
         let sizing = if let Some(word) = word_output.word {
             Some(SizingToken{ data: word })
         } else {
-            None
+            unreachable!("get_sizing dispatched when singleton should have been found by get_typespec");
         };
         let errors = word_output.errors;
         SizingParserOutput {
@@ -119,33 +128,55 @@ pub fn get_word<'a>(data: &'a str, start_col: usize) -> WordParserOutput<'a> {
     }
 }
 
-#[derive(Debug, PartialEq)]
-struct TypeSpecParserOutput<'a> {
-    dtype: Option<DtypeToken<'a>>,
-    sizing: Option<SizingToken<'a>>,
-    errors: Vec<ElucidatorError>,
-}
 
 pub fn get_typespec<'a>(data: &'a str, start_col: usize) -> TypeSpecParserOutput {
-    let mut dtype = None;
-    let mut sizing = None;
+    let dtype ;
+    let sizing ;
+    let is_singleton;
+    let end_of_dtype ;
     let mut errors = Vec::new();
-
-    if let Some((dt, contents)) = data.split_once("[") {
-        let lbracket_pos = data.position("[").unwrap();
-        match contents.position("]") {
+    if let Some((_, contents)) = data.split_once("[") {
+        is_singleton = false;
+        let lbracket_pos = data.chars().position(|c| c == '[').unwrap();
+        end_of_dtype = lbracket_pos;
+        match contents.chars().position(|c| c == ']') {
             Some(rbracket_pos) => {
+                let spo = get_sizing(
+                    &data[lbracket_pos+1..rbracket_pos],
+                    start_col + rbracket_pos
+                );
+                sizing = spo.sizing;
+                for error in &spo.errors {
+                    errors.push(error.clone());
+                }
             },
             None => {
+                sizing = None;
+                errors.push(
+                    ElucidatorError::Parsing {
+                        offender: data.to_string(),
+                        reason: ParsingFailure::UnexpectedEndOfExpression
+                    }
+                );
             }
         }
     } else {
+        is_singleton = true;
+        end_of_dtype = data.len();
+        sizing = None;
     }
+
+    let dpo = get_dtype(&data[..end_of_dtype], start_col);
+    dtype = dpo.dtype;
+    for error in &dpo.errors {
+        errors.push(error.clone());
+    } 
 
     TypeSpecParserOutput {
         dtype,
         sizing,
         errors,
+        is_singleton,
     }
 }
 
@@ -156,7 +187,7 @@ pub fn get_memberspec<'a>(data: &'a str, start_col: usize) -> MemberSpecParserOu
     let mut errors = Vec::new();
 
     if let Some((left_of_colon, right_of_colon)) = data.split_once(":") {
-        let colon_pos = data.chars().position(":").unwrap();
+        let colon_pos = data.chars().position(|c| c == ':').unwrap();
         // Identifier parsing
         let ipo = get_identifier(left_of_colon, start_col);
         identifier = ipo.identifier;
@@ -171,7 +202,7 @@ pub fn get_memberspec<'a>(data: &'a str, start_col: usize) -> MemberSpecParserOu
             errors.push(error.clone());
         }
     } else {
-        // There is no colon; what do?
+        todo!("Handle case where there is no colon in member spec");
     }
 
     MemberSpecParserOutput {
