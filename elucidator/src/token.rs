@@ -91,7 +91,7 @@ mod test {
     use super::*;
 
     #[test]
-    #[should_panic(expected = "bad sizing")]
+    #[should_panic(expected = "Bad sizing")]
     fn token_data_new_bad_span_size_err() {
         let _ = TokenData::new("cat", 0, 1);
     }

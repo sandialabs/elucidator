@@ -70,7 +70,7 @@ pub fn get_dtype<'a>(data: &'a str, start_col: usize) -> DtypeParserOutput<'a> {
 
 pub fn get_sizing<'a>(data: &'a str, start_col: usize) -> SizingParserOutput<'a> {
     if data.chars().all(|x| x.is_whitespace()) {
-        let data_len = data.len();
+        let data_len = data.chars().count();
         let last_slice = if data_len == 0 {
             &data[0..0]
         } else {
@@ -164,7 +164,7 @@ pub fn get_typespec<'a>(data: &'a str, start_col: usize) -> TypeSpecParserOutput
                 let byte_end = rbracket_byte_pos;
                 let spo = get_sizing(
                     &data[byte_start..byte_end],
-                    start_col + lbracket_pos
+                    start_col + lbracket_pos + 1
                 );
                 sizing = spo.sizing;
                 for error in &spo.errors {
@@ -665,8 +665,7 @@ mod test {
             // We have an inconsistent use of bytes/chars in our codebase
             // This breaks assumptions when we give 2-byte chars in utf8
             // For the moment, we only give it valid ASCII values (1-byte chars)
-            const ASCII_MAX: u8 = 127;
-            (ASCII_MAX+1..=u8::MAX)
+            (u8::MIN..=u8::MAX)
                 .map(|x| x as char)
                 .filter(|x| x.is_whitespace())
                 .collect()
@@ -675,13 +674,11 @@ mod test {
         /// Get random whitespace
         fn get_random_whitespace(num_chars: usize) -> String {
             let whitespace_chars = get_whitespace_chars();
-            let result = (0..num_chars)
+            (0..num_chars)
                 .map(|_| random::<usize>() % whitespace_chars.len())
                 .map(|x| String::from(whitespace_chars[x]))
                 .collect::<Vec<String>>()
-                .join("");
-            // result
-            whitespace_chars.iter().collect::<String>()
+                .join("")
         }
 
         /// Produce a potential whitespace fill
