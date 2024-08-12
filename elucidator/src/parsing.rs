@@ -269,6 +269,103 @@ pub fn validated_trimmed_or_err(_: &str) -> Result<&str> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use rand::random;
+
+        fn lowercase_ascii_chars() -> Vec<char> {
+            (u8::MIN..u8::MAX)
+                .map(|x| x as char)
+                .filter(|x| x.is_ascii_lowercase())
+                .collect()
+        }
+
+        /// Get the set of whitespace characters
+        fn get_whitespace_chars() -> Vec<char> {
+            // TODO:
+            // We have an inconsistent use of bytes/chars in our codebase
+            // This breaks assumptions when we give 2-byte chars in utf8
+            // For the moment, we only give it valid ASCII values (1-byte chars)
+            (u8::MIN..=u8::MAX)
+                .map(|x| x as char)
+                .filter(|x| x.is_whitespace())
+                .collect()
+        }
+
+        fn random_lowercase_ascii_char() -> char {
+            lowercase_ascii_chars()[
+                random::<usize>() % lowercase_ascii_chars().len()
+            ]
+        }
+
+        fn random_word() -> String {
+            let id_len = (random::<u8>() % 9) + 1;
+            (0..id_len)
+                .map(|_| random_lowercase_ascii_char())
+                .collect()
+        }
+
+        fn random_sizing(whitespace: bool) -> String {
+            match random::<u8>() % 3 {
+                0 => {
+                    // Singleton
+                    String::from("")
+                },
+                1 => {
+                    // Fixed
+                    let size: u8 = random();
+                    if whitespace {
+                        format!("[{}{size}{}]", fill(), fill())
+                    } else {
+                        format!("[{size}]")
+                    }
+                },
+                2 => {
+                    // Dynamic
+                    if whitespace {
+                        format!("[{}]", fill())
+                    } else {
+                        String::from("[]")
+                    }
+                },
+                _ => { unreachable!(); },
+            }
+        }
+
+        fn random_memberspec() -> String {
+            let identifier = random_word();
+            let dtype = random_word();
+            let sizing = random_sizing(false);
+            format!("{identifier}:{dtype}{sizing}")
+        }
+
+        fn random_memberspec_whitespace() -> String {
+            let lidentifier = fill();
+            let identifier = random_word();
+            let ridentifier = fill();
+            let ldtype = fill();
+            let dtype = random_word();
+            let rdtype = fill();
+            let sizing = random_sizing(true);
+            let endspace = fill();
+            let idblock = format!("{lidentifier}{identifier}{ridentifier}");
+            let dtypeblock = format!("{ldtype}{dtype}{rdtype}");
+            format!("{idblock}:{dtypeblock}{sizing}{endspace}")
+        }
+
+        /// Get random whitespace
+        fn random_whitespace(num_chars: usize) -> String {
+            let whitespace_chars = get_whitespace_chars();
+            (0..num_chars)
+                .map(|_| random::<usize>() % whitespace_chars.len())
+                .map(|x| String::from(whitespace_chars[x]))
+                .collect::<Vec<String>>()
+                .join("")
+        }
+
+        /// Produce a potential whitespace fill
+        fn fill() -> String {
+            let whitespace = random_whitespace(random::<usize>() % 4);
+            whitespace
+        }
 
     mod word {
         use super::*;
@@ -624,8 +721,6 @@ mod test {
     // Tests marked "invalid" are invalid according to the standard, but are parseable.
     mod member_spec {
         use super::*;
-        use rand::prelude::random;
-
     
         /// For making sure text with no whitespace works
         fn run_ok_simple(ident: &str, dtype: &str, sizing: Option<&str>) {
@@ -666,34 +761,6 @@ mod test {
             assert_eq!(output.dtype, Some(t_dtype));
             assert_eq!(output.sizing, t_sizing);
             assert!(output.errors.is_empty());
-        }
-
-        /// Get the set of whitespace characters
-        fn get_whitespace_chars() -> Vec<char> {
-            // TODO:
-            // We have an inconsistent use of bytes/chars in our codebase
-            // This breaks assumptions when we give 2-byte chars in utf8
-            // For the moment, we only give it valid ASCII values (1-byte chars)
-            (u8::MIN..=u8::MAX)
-                .map(|x| x as char)
-                .filter(|x| x.is_whitespace())
-                .collect()
-        }
-
-        /// Get random whitespace
-        fn get_random_whitespace(num_chars: usize) -> String {
-            let whitespace_chars = get_whitespace_chars();
-            (0..num_chars)
-                .map(|_| random::<usize>() % whitespace_chars.len())
-                .map(|x| String::from(whitespace_chars[x]))
-                .collect::<Vec<String>>()
-                .join("")
-        }
-
-        /// Produce a potential whitespace fill
-        fn fill() -> String {
-            let whitespace = get_random_whitespace(random::<usize>() % 4);
-            whitespace
         }
 
         /// Run a single test case of whitespace insertion
@@ -844,51 +911,37 @@ mod test {
     mod metadata {
         use super::*;
 
-        use rand::random;
-
-        fn lowercase_ascii_chars() -> Vec<char> {
-            (u8::MIN..u8::MAX)
-                .map(|x| x as char)
-                .filter(|x| x.is_ascii_lowercase())
-                .collect()
-        }
-
-        fn random_lowercase_ascii_char() -> char {
-            lowercase_ascii_chars()[
-                random::<usize>() % lowercase_ascii_chars().len()
-            ]
-        }
-
-        fn random_word() -> String {
-            let id_len = (random::<u8>() % 9) + 1;
-            (0..id_len)
-                .map(|_| random_lowercase_ascii_char())
-                .collect()
-        }
-
-        fn random_sizing() -> String {
-            match random::<u8>() % 3 {
-                0 => {
-                    // Singleton
-                    String::from("")
-                },
-                1 => {
-                    // Fixed
-                    let size: u8 = random();
-                    format!("[{size}]")
-                },
-                2 => {
-                    // Dynamic
-                    String::from("[]")
-                },
-                _ => { unreachable!(); },
-            }
-        }
-
-        fn random_memberspec() -> String {
-            let identifier = random_word();
-            let dtype = random_word();
-            identifier
+        fn run_property_test(whitespace: bool) {
+            let n_specs = random::<u8>();
+            let generator = if whitespace {
+                random_memberspec_whitespace
+            } else {
+                random_memberspec
+            };
+            let member_specs: Vec<String> = (0..n_specs)
+                .map(|_| generator())
+                .collect();
+            let metadata_spec_text = member_specs.join(",");
+            let mut start_positions = metadata_spec_text
+                .char_indices()
+                .filter(|(_, c)| *c == ',')
+                .map(|(i, _)| i + 1)
+                .collect::<Vec<usize>>();
+            start_positions.insert(0, 0);
+            let parsed_members: Vec<MemberSpecParserOutput> = member_specs
+                .iter()
+                .zip(start_positions.iter())
+                .map(|(x, pos)| get_memberspec(x, *pos))
+                .collect();
+            assert_eq!(start_positions.len(), parsed_members.len());
+            let metadata_spec = get_metadataspec(&metadata_spec_text);
+            assert_eq!(
+                metadata_spec,
+                MetadataSpecParserOutput {
+                    member_outputs: parsed_members,
+                    errors: Vec::new(),
+                }
+            );
         }
 
         #[test]
@@ -923,6 +976,73 @@ mod test {
                 }
             );
         }
+
+        #[test]
+        fn no_whitespace_property_ok() {
+            for _ in 0..500 {
+                run_property_test(false)
+            }
+        }
+
+        #[test]
+        fn whitespace_property_ok() {
+            for _ in 0..500 {
+                run_property_test(true)
+            }
+        }
+
+        #[test]
+        fn blank_spec_ok() {
+            let spec = "";
+            let metadata_spec = get_metadataspec(spec);
+            assert_eq!(
+                metadata_spec,
+                MetadataSpecParserOutput {
+                    member_outputs: Vec::new(),
+                    errors: Vec::new(),
+                },
+            );
+        }
+
+        // TODO: handle case where some memberspecs are erroneous and others aren't
+        #[test]
+        fn some_ok_some_not() {
+            let member_specs = [
+                "woofs: u8",
+                ": f32[",
+                "splashes: i32[100]",
+                "flaps: []",
+                "meows: i32",
+            ];
+            let spec = member_specs.join(", ");
+            let mut start_positions = spec
+                .char_indices()
+                .filter(|(_, c)| *c == ',')
+                .map(|(i, _)| i + 1)
+                .collect::<Vec<usize>>();
+            start_positions.insert(0, 0);
+            let parsed_members: Vec<MemberSpecParserOutput> = member_specs
+                .iter()
+                .zip(start_positions.iter())
+                .map(|(x, pos)| get_memberspec(x, *pos))
+                .collect();
+            assert_eq!(start_positions.len(), parsed_members.len());
+            let metadata_spec = get_metadataspec(&spec);
+            let expected_errors: Vec<ElucidatorError> = parsed_members
+                .iter()
+                .flat_map(|x| x.errors.iter())
+                .map(|x| x.clone())
+                .collect();
+            assert_eq!(
+                metadata_spec,
+                MetadataSpecParserOutput {
+                    member_outputs: parsed_members,
+                    errors: expected_errors,
+                }
+            );
+        }
+
+        // TODO: handle case where all memberspecs are invalid
     }
 
     
