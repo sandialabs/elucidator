@@ -39,6 +39,11 @@ pub(crate) struct MemberSpecParserOutput<'a> {
     sizing: Option<SizingToken<'a>>,
     errors: Vec<ElucidatorError>,
 }
+#[derive(Debug, PartialEq)]
+pub(crate) struct MetadataSpecParserOutput<'a> {
+    member_outputs: Vec<MemberSpecParserOutput<'a>>,
+    errors: Vec<ElucidatorError>,
+}
 
 pub fn get_identifier<'a>(data: &'a str, start_col: usize) -> IdentifierParserOutput {
     let word_output = get_word(data, start_col);
@@ -237,6 +242,10 @@ pub fn get_memberspec<'a>(data: &'a str, start_col: usize) -> MemberSpecParserOu
         sizing,
         errors,
     }
+}
+
+pub fn get_metadataspec<'a>(data: &'a str) -> MetadataSpecParserOutput<'a> {
+    unimplemented!();
 }
 
 // TODO: REMOVE
@@ -829,6 +838,90 @@ mod test {
                     ]
                 }
             )
+        }
+    }
+
+    mod metadata {
+        use super::*;
+
+        use rand::random;
+
+        fn lowercase_ascii_chars() -> Vec<char> {
+            (u8::MIN..u8::MAX)
+                .map(|x| x as char)
+                .filter(|x| x.is_ascii_lowercase())
+                .collect()
+        }
+
+        fn random_lowercase_ascii_char() -> char {
+            lowercase_ascii_chars()[
+                random::<usize>() % lowercase_ascii_chars().len()
+            ]
+        }
+
+        fn random_word() -> String {
+            let id_len = (random::<u8>() % 9) + 1;
+            (0..id_len)
+                .map(|_| random_lowercase_ascii_char())
+                .collect()
+        }
+
+        fn random_sizing() -> String {
+            match random::<u8>() % 3 {
+                0 => {
+                    // Singleton
+                    String::from("")
+                },
+                1 => {
+                    // Fixed
+                    let size: u8 = random();
+                    format!("[{size}]")
+                },
+                2 => {
+                    // Dynamic
+                    String::from("[]")
+                },
+                _ => { unreachable!(); },
+            }
+        }
+
+        fn random_memberspec() -> String {
+            let identifier = random_word();
+            let dtype = random_word();
+            identifier
+        }
+
+        #[test]
+        fn no_comma_ok() {
+            let spec = "foo:u8";
+            let metadata_spec = get_metadataspec(spec);
+            assert_eq!(
+                metadata_spec,
+                MetadataSpecParserOutput {
+                    member_outputs: vec![
+                        get_memberspec(spec, 0),
+                    ],
+                    errors: Vec::new(),
+                }
+            );
+        }
+
+        #[test]
+        fn two_members_no_whitespace() {
+            let m1 = "foo:u8[10]";
+            let m2 = "bar:i32[]";
+            let spec = &format!("{m1},{m2}");
+            let metadata_spec = get_metadataspec(spec);
+            assert_eq!(
+                metadata_spec,
+                MetadataSpecParserOutput {
+                    member_outputs: vec![
+                        get_memberspec(m1, 0),
+                        get_memberspec(m2, m1.chars().count() + 1),
+                    ],
+                    errors: Vec::new(),
+                }
+            );
         }
     }
 
