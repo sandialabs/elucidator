@@ -118,8 +118,8 @@ pub fn get_word<'a>(data: &'a str, start_col: usize) -> WordParserOutput<'a> {
             }
         );
     };
-    let (id_byte_start, _) = id_start.unwrap();
     if errors.is_empty() {
+        let (id_byte_start, _) = id_start.unwrap();
         // TODO:
         // This is our actual error:
         // id_start is defined as the index of the first whitespace *character*
@@ -245,7 +245,38 @@ pub fn get_memberspec<'a>(data: &'a str, start_col: usize) -> MemberSpecParserOu
 }
 
 pub fn get_metadataspec<'a>(data: &'a str) -> MetadataSpecParserOutput<'a> {
-    unimplemented!();
+    let errors: Vec<ElucidatorError>;
+    let member_outputs: Vec<MemberSpecParserOutput>; 
+
+    let mut start_positions = data
+        .char_indices()
+        .filter(|(_, c)| *c == ',')
+        .map(|(i, _)| i + 1)
+        .collect::<Vec<usize>>();
+    start_positions.insert(0, 0);
+
+    if data.chars().all(char::is_whitespace) {
+        member_outputs = Vec::new();
+    } else if !data.chars().any(|c| c == ',') {
+        member_outputs = vec![get_memberspec(data, 0)]
+    } else {
+        member_outputs = data
+            .split(",")
+            .zip(start_positions)
+            .map(|(member_spec, pos)| get_memberspec(member_spec, pos))
+            .collect();
+    }
+
+    errors = member_outputs
+        .iter()
+        .flat_map(|member_output| member_output.errors.iter())
+        .map(|e| e.clone())
+        .collect();
+
+    MetadataSpecParserOutput {
+        member_outputs,
+        errors
+    }
 }
 
 // TODO: REMOVE
@@ -270,102 +301,103 @@ pub fn validated_trimmed_or_err(_: &str) -> Result<&str> {
 mod test {
     use super::*;
     use rand::random;
+    use pretty_assertions::{assert_eq, assert_ne};
 
-        fn lowercase_ascii_chars() -> Vec<char> {
-            (u8::MIN..u8::MAX)
-                .map(|x| x as char)
-                .filter(|x| x.is_ascii_lowercase())
-                .collect()
-        }
+    fn lowercase_ascii_chars() -> Vec<char> {
+        (u8::MIN..u8::MAX)
+            .map(|x| x as char)
+            .filter(|x| x.is_ascii_lowercase())
+            .collect()
+    }
 
-        /// Get the set of whitespace characters
-        fn get_whitespace_chars() -> Vec<char> {
-            // TODO:
-            // We have an inconsistent use of bytes/chars in our codebase
-            // This breaks assumptions when we give 2-byte chars in utf8
-            // For the moment, we only give it valid ASCII values (1-byte chars)
-            (u8::MIN..=u8::MAX)
-                .map(|x| x as char)
-                .filter(|x| x.is_whitespace())
-                .collect()
-        }
+    /// Get the set of whitespace characters
+    fn get_whitespace_chars() -> Vec<char> {
+        // TODO:
+        // We have an inconsistent use of bytes/chars in our codebase
+        // This breaks assumptions when we give 2-byte chars in utf8
+        // For the moment, we only give it valid ASCII values (1-byte chars)
+        (u8::MIN..=u8::MAX)
+            .map(|x| x as char)
+            .filter(|x| x.is_whitespace())
+            .collect()
+    }
 
-        fn random_lowercase_ascii_char() -> char {
-            lowercase_ascii_chars()[
-                random::<usize>() % lowercase_ascii_chars().len()
-            ]
-        }
+    fn random_lowercase_ascii_char() -> char {
+        lowercase_ascii_chars()[
+            random::<usize>() % lowercase_ascii_chars().len()
+        ]
+    }
 
-        fn random_word() -> String {
-            let id_len = (random::<u8>() % 9) + 1;
-            (0..id_len)
-                .map(|_| random_lowercase_ascii_char())
-                .collect()
-        }
+    fn random_word() -> String {
+        let id_len = (random::<u8>() % 9) + 1;
+        (0..id_len)
+            .map(|_| random_lowercase_ascii_char())
+            .collect()
+    }
 
-        fn random_sizing(whitespace: bool) -> String {
-            match random::<u8>() % 3 {
-                0 => {
-                    // Singleton
-                    String::from("")
-                },
-                1 => {
-                    // Fixed
-                    let size: u8 = random();
-                    if whitespace {
-                        format!("[{}{size}{}]", fill(), fill())
-                    } else {
-                        format!("[{size}]")
-                    }
-                },
-                2 => {
-                    // Dynamic
-                    if whitespace {
-                        format!("[{}]", fill())
-                    } else {
-                        String::from("[]")
-                    }
-                },
-                _ => { unreachable!(); },
-            }
+    fn random_sizing(whitespace: bool) -> String {
+        match random::<u8>() % 3 {
+            0 => {
+                // Singleton
+                String::from("")
+            },
+            1 => {
+                // Fixed
+                let size: u8 = random();
+                if whitespace {
+                    format!("[{}{size}{}]", fill(), fill())
+                } else {
+                    format!("[{size}]")
+                }
+            },
+            2 => {
+                // Dynamic
+                if whitespace {
+                    format!("[{}]", fill())
+                } else {
+                    String::from("[]")
+                }
+            },
+            _ => { unreachable!(); },
         }
+    }
 
-        fn random_memberspec() -> String {
-            let identifier = random_word();
-            let dtype = random_word();
-            let sizing = random_sizing(false);
-            format!("{identifier}:{dtype}{sizing}")
-        }
+    fn random_memberspec() -> String {
+        let identifier = random_word();
+        let dtype = random_word();
+        let sizing = random_sizing(false);
+        format!("{identifier}:{dtype}{sizing}")
+    }
 
-        fn random_memberspec_whitespace() -> String {
-            let lidentifier = fill();
-            let identifier = random_word();
-            let ridentifier = fill();
-            let ldtype = fill();
-            let dtype = random_word();
-            let rdtype = fill();
-            let sizing = random_sizing(true);
-            let endspace = fill();
-            let idblock = format!("{lidentifier}{identifier}{ridentifier}");
-            let dtypeblock = format!("{ldtype}{dtype}{rdtype}");
-            format!("{idblock}:{dtypeblock}{sizing}{endspace}")
-        }
+    fn random_memberspec_whitespace() -> String {
+        let lidentifier = fill();
+        let identifier = random_word();
+        let ridentifier = fill();
+        let ldtype = fill();
+        let dtype = random_word();
+        let rdtype = fill();
+        let sizing = random_sizing(true);
+        let endspace = fill();
+        let idblock = format!("{lidentifier}{identifier}{ridentifier}");
+        let dtypeblock = format!("{ldtype}{dtype}{rdtype}");
+        format!("{idblock}:{dtypeblock}{sizing}{endspace}")
+    }
 
-        /// Get random whitespace
-        fn random_whitespace(num_chars: usize) -> String {
-            let whitespace_chars = get_whitespace_chars();
-            (0..num_chars)
-                .map(|_| random::<usize>() % whitespace_chars.len())
-                .map(|x| String::from(whitespace_chars[x]))
-                .collect::<Vec<String>>()
-                .join("")
-        }
+    /// Get random whitespace
+    fn random_whitespace(num_chars: usize) -> String {
+        let whitespace_chars = get_whitespace_chars();
+        (0..num_chars)
+            .map(|_| random::<usize>() % whitespace_chars.len())
+            .map(|x| String::from(whitespace_chars[x]))
+            .collect::<Vec<String>>()
+            .join("")
+    }
 
-        /// Produce a potential whitespace fill
-        fn fill() -> String {
-            let whitespace = random_whitespace(random::<usize>() % 4);
-            whitespace
-        }
+    /// Produce a potential whitespace fill
+    fn fill() -> String {
+        let whitespace = random_whitespace(random::<usize>() % 4);
+        whitespace
+    }
 
     mod word {
         use super::*;
@@ -381,7 +413,7 @@ mod test {
                 2,
                 length + 2,
             );
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 WordParserOutput{
                     word: Some(token_data),
@@ -395,13 +427,31 @@ mod test {
             let text = "valid_word";
             let output = get_word(text, 0);
             let data = TokenData::new(text, 0, text.len());
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 WordParserOutput {
                     word: Some(data),
                     errors: Vec::new(),
                 }
             );
+        }
+
+        #[test]
+        fn only_whitespace_err() {
+            let text = "    ";
+            let output = get_word(text, 0);
+            pretty_assertions::assert_eq!(
+                output,
+                WordParserOutput{
+                    word: None,
+                    errors: vec![
+                        ElucidatorError::Parsing {
+                            offender: text.to_string(),
+                            reason: ParsingFailure::UnexpectedEndOfExpression
+                        }
+                    ],
+                }
+            ); 
         }
     }
 
@@ -419,7 +469,7 @@ mod test {
                 2,
                 length + 2,
             )};
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 IdentifierParserOutput {
                     identifier: Some(itoken),
@@ -434,7 +484,7 @@ mod test {
             let output = get_identifier(text, 0);
             let data = TokenData::new(text, 0, text.len());
             let itoken = IdentifierToken { data };
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 IdentifierParserOutput {
                     identifier: Some(itoken),
@@ -458,7 +508,7 @@ mod test {
                 2,
                 length + 2,
             )};
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 DtypeParserOutput {
                     dtype: Some(dtoken),
@@ -473,7 +523,7 @@ mod test {
             let output = get_dtype(text, 0);
             let data = TokenData::new(text, 0, text.len());
             let dtoken = DtypeToken { data };
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 DtypeParserOutput {
                     dtype: Some(dtoken),
@@ -497,7 +547,7 @@ mod test {
                 2,
                 length + 2,
             )};
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 SizingParserOutput {
                     sizing: Some(stoken),
@@ -512,7 +562,7 @@ mod test {
             let output = get_sizing(text, 0);
             let data = TokenData::new(text, 0, text.len());
             let stoken = SizingToken { data };
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 SizingParserOutput {
                     sizing: Some(stoken),
@@ -532,7 +582,7 @@ mod test {
                 5,
                 length + 5,
             )};
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 SizingParserOutput {
                     sizing: Some(stoken),
@@ -547,7 +597,7 @@ mod test {
             let output = get_sizing(text, 0);
             let data = TokenData::new(text, 0, text.len());
             let stoken = SizingToken { data };
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 SizingParserOutput {
                     sizing: Some(stoken),
@@ -573,7 +623,7 @@ mod test {
                 2,
                 length + 2,
             )};
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 TypeSpecParserOutput {
                     sizing: None,
@@ -591,7 +641,7 @@ mod test {
             let data = TokenData::new(text, 0, text.len());
             let dtoken = DtypeToken{data};
             let stoken = None;
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 TypeSpecParserOutput {
                     dtype: Some(dtoken),
@@ -633,7 +683,7 @@ mod test {
                     end,
             )};
             let output = get_typespec(text, 0);
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 TypeSpecParserOutput {
                     sizing: Some(stoken),
@@ -673,7 +723,7 @@ mod test {
                     end,
             )};
             let output = get_typespec(text, 0);
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 TypeSpecParserOutput {
                     sizing: Some(stoken),
@@ -704,7 +754,7 @@ mod test {
                     end,
             )};
             let output = get_typespec(text, 0);
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 output,
                 TypeSpecParserOutput {
                     sizing: None,
@@ -757,9 +807,9 @@ mod test {
                 })
             } else { None };
 
-            assert_eq!(output.identifier, Some(t_identifier));
-            assert_eq!(output.dtype, Some(t_dtype));
-            assert_eq!(output.sizing, t_sizing);
+            pretty_assertions::assert_eq!(output.identifier, Some(t_identifier));
+            pretty_assertions::assert_eq!(output.dtype, Some(t_dtype));
+            pretty_assertions::assert_eq!(output.sizing, t_sizing);
             assert!(output.errors.is_empty());
         }
 
@@ -827,9 +877,9 @@ mod test {
                 })
             } else { None };
 
-            assert_eq!(output.identifier, Some(t_identifier));
-            assert_eq!(output.dtype, Some(t_dtype));
-            assert_eq!(output.sizing, t_sizing);
+            pretty_assertions::assert_eq!(output.identifier, Some(t_identifier));
+            pretty_assertions::assert_eq!(output.dtype, Some(t_dtype));
+            pretty_assertions::assert_eq!(output.sizing, t_sizing);
             assert!(output.errors.is_empty());
         }
 
@@ -891,7 +941,7 @@ mod test {
         fn missing_delimiter_fails() {
             let text = "  foo u8 ";
             let member_spec = get_memberspec(text, 0);
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 member_spec,
                 MemberSpecParserOutput {
                     identifier: None,
@@ -912,7 +962,7 @@ mod test {
         use super::*;
 
         fn run_property_test(whitespace: bool) {
-            let n_specs = random::<u8>();
+            let n_specs = random::<u8>() % 10 + 1;
             let generator = if whitespace {
                 random_memberspec_whitespace
             } else {
@@ -933,9 +983,9 @@ mod test {
                 .zip(start_positions.iter())
                 .map(|(x, pos)| get_memberspec(x, *pos))
                 .collect();
-            assert_eq!(start_positions.len(), parsed_members.len());
+            pretty_assertions::assert_eq!(start_positions.len(), parsed_members.len());
             let metadata_spec = get_metadataspec(&metadata_spec_text);
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 metadata_spec,
                 MetadataSpecParserOutput {
                     member_outputs: parsed_members,
@@ -948,7 +998,7 @@ mod test {
         fn no_comma_ok() {
             let spec = "foo:u8";
             let metadata_spec = get_metadataspec(spec);
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 metadata_spec,
                 MetadataSpecParserOutput {
                     member_outputs: vec![
@@ -965,7 +1015,7 @@ mod test {
             let m2 = "bar:i32[]";
             let spec = &format!("{m1},{m2}");
             let metadata_spec = get_metadataspec(spec);
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 metadata_spec,
                 MetadataSpecParserOutput {
                     member_outputs: vec![
@@ -995,7 +1045,7 @@ mod test {
         fn blank_spec_ok() {
             let spec = "";
             let metadata_spec = get_metadataspec(spec);
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 metadata_spec,
                 MetadataSpecParserOutput {
                     member_outputs: Vec::new(),
@@ -1014,7 +1064,7 @@ mod test {
                 "flaps: []",
                 "meows: i32",
             ];
-            let spec = member_specs.join(", ");
+            let spec = member_specs.join(",");
             let mut start_positions = spec
                 .char_indices()
                 .filter(|(_, c)| *c == ',')
@@ -1026,14 +1076,14 @@ mod test {
                 .zip(start_positions.iter())
                 .map(|(x, pos)| get_memberspec(x, *pos))
                 .collect();
-            assert_eq!(start_positions.len(), parsed_members.len());
+            pretty_assertions::assert_eq!(start_positions.len(), parsed_members.len());
             let metadata_spec = get_metadataspec(&spec);
             let expected_errors: Vec<ElucidatorError> = parsed_members
                 .iter()
                 .flat_map(|x| x.errors.iter())
                 .map(|x| x.clone())
                 .collect();
-            assert_eq!(
+            pretty_assertions::assert_eq!(
                 metadata_spec,
                 MetadataSpecParserOutput {
                     member_outputs: parsed_members,

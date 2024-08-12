@@ -9,4 +9,5 @@ edition = "2021"
 elucidator_macros = { path = "../elucidator_macros" }
 
 [dev-dependencies]
+pretty_assertions = "1.4.0"
 rand = "0.8.5"
