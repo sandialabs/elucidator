@@ -31,6 +31,33 @@ impl ElucidatorError {
             to: to.to_string(),
         })
     }
+    fn expand(&self) -> Vec<ElucidatorError> {
+        match &self {
+            Self::MultipleFailures(errs) => {
+                errs.iter()
+                    .map(|e| e.expand())
+                    .flatten()
+                    .collect()
+            },
+            _ => {
+                vec![self.clone()]
+            }
+        }
+    }
+    pub fn merge_with(left: &ElucidatorError, right: &ElucidatorError) -> ElucidatorError {
+        Self::merge(&vec![left.clone(), right.clone()])
+    }
+    pub fn merge(errs: &Vec<ElucidatorError>) -> ElucidatorError {
+        let errors: Vec<ElucidatorError> = errs.iter()
+            .map(ElucidatorError::expand)
+            .flatten()
+            .collect();
+        if errors.len() == 1 {
+            errors[0].clone()
+        } else {
+            ElucidatorError::MultipleFailures(Box::new(errors))
+        }
+    }
 }
 
 impl fmt::Display for ElucidatorError {
@@ -107,6 +134,7 @@ pub enum SpecificationFailure {
     IdentifierStartsNonAlphabetical,
     IllegalDataType,
     ZeroLengthIdentifier,
+    IllegalCharacters(Vec<char>),
 }
 
 impl fmt::Display for SpecificationFailure {
@@ -121,7 +149,15 @@ impl fmt::Display for SpecificationFailure {
             Self::IllegalDataType => { "Illegal data type".to_string() },
             Self::ZeroLengthIdentifier => { 
                 format!("Identifiers must have non-zero length")
-            }
+            },
+            Self::IllegalCharacters(clist) => {
+                let offending_list = clist
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                format!("Illegal characters encountered: {offending_list}")
+            },
         };
         write!(f, "{m}")
     }
