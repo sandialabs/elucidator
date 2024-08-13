@@ -14,18 +14,18 @@
 /// ```
 #[derive(Debug, PartialEq)]
 pub(crate) struct TokenData<'a> {
-    data: &'a str,
-    column_start: usize,
-    column_end: usize, 
+    pub data: &'a str,
+    pub column_start: usize,
+    pub column_end: usize, 
 }
 
 impl<'a> TokenData<'a> {
     pub fn new(data: &'a str, column_start: usize, column_end: usize) -> TokenData {
-        let data_len = data.len();
+        let column_width = data.chars().count();
         assert!(column_start <= column_end, "columns swapped");
         assert!(
-            data.len() == column_end - column_start,
-            "Bad sizing; start {column_start} end {column_end}, slice len {data_len}, slice {data}"
+            data.chars().count() == column_end - column_start,
+            "Bad sizing; start {column_start} end {column_end}, column width {column_width}, slice {data}"
         );
         TokenData { data, column_start, column_end }
     }
