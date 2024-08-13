@@ -3,6 +3,7 @@ use crate::error::*;
 pub use representable::Representable;
 
 mod parsing;
+mod validating;
 mod test_utils;
 mod token;
 pub mod error;
