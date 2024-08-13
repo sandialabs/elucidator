@@ -10,14 +10,14 @@ pub(crate) struct WordParserOutput<'a> {
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct IdentifierParserOutput<'a> {
-    identifier: Option<IdentifierToken<'a>>,
-    errors: Vec<ElucidatorError>,
+    pub identifier: Option<IdentifierToken<'a>>,
+    pub errors: Vec<ElucidatorError>,
 }
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct DtypeParserOutput<'a> {
-    dtype: Option<DtypeToken<'a>>,
-    errors: Vec<ElucidatorError>,
+    pub dtype: Option<DtypeToken<'a>>,
+    pub errors: Vec<ElucidatorError>,
 }
 
 #[derive(Debug, PartialEq)]

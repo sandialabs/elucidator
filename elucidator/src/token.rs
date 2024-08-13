@@ -60,7 +60,7 @@ pub(crate) enum Token<'a> {
 }
 
 impl <'a> Token<'a> {
-    fn get_data(&self) -> &str {
+    pub fn get_data(&self) -> &str {
         match &self {
             Token::Identifier(token) =>  token.data.data,
             Token::Dtype(token) =>  token.data.data,
@@ -68,7 +68,7 @@ impl <'a> Token<'a> {
             Token::Delimiter(token) =>  token.data.data,
         }
     }
-    fn get_column_start(&self) -> usize {
+    pub fn get_column_start(&self) -> usize {
         match &self {
             Token::Identifier(token) =>  token.data.column_start,
             Token::Dtype(token) =>  token.data.column_start,
@@ -76,7 +76,7 @@ impl <'a> Token<'a> {
             Token::Delimiter(token) =>  token.data.column_start,
         }
     }
-    fn get_column_end(&self) -> usize {
+    pub fn get_column_end(&self) -> usize {
         match &self {
             Token::Identifier(token) =>  token.data.column_end,
             Token::Dtype(token) =>  token.data.column_end,
