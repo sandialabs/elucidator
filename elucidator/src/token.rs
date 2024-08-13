@@ -51,41 +51,6 @@ pub(crate) struct DelimiterToken<'a> {
     pub data: TokenData<'a>,
 }
 
-#[derive(Debug, PartialEq)]
-pub(crate) enum Token<'a> {
-    Identifier(IdentifierToken<'a>),
-    Dtype(DtypeToken<'a>),
-    Sizing(SizingToken<'a>),
-    Delimiter(DelimiterToken<'a>),
-}
-
-impl <'a> Token<'a> {
-    pub fn get_data(&self) -> &str {
-        match &self {
-            Token::Identifier(token) =>  token.data.data,
-            Token::Dtype(token) =>  token.data.data,
-            Token::Sizing(token) =>  token.data.data,
-            Token::Delimiter(token) =>  token.data.data,
-        }
-    }
-    pub fn get_column_start(&self) -> usize {
-        match &self {
-            Token::Identifier(token) =>  token.data.column_start,
-            Token::Dtype(token) =>  token.data.column_start,
-            Token::Sizing(token) =>  token.data.column_start,
-            Token::Delimiter(token) =>  token.data.column_start,
-        }
-    }
-    pub fn get_column_end(&self) -> usize {
-        match &self {
-            Token::Identifier(token) =>  token.data.column_end,
-            Token::Dtype(token) =>  token.data.column_end,
-            Token::Sizing(token) =>  token.data.column_end,
-            Token::Delimiter(token) =>  token.data.column_end,
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
