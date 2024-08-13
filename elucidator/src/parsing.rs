@@ -120,18 +120,8 @@ pub fn get_word<'a>(data: &'a str, start_col: usize) -> WordParserOutput<'a> {
     };
     if errors.is_empty() {
         let (id_byte_start, _) = id_start.unwrap();
-        // TODO:
-        // This is our actual error:
-        // id_start is defined as the index of the first whitespace *character*
-        // We are then using that index on the *bytes* of data
-        // let id_end = if let Some(pos) = data[id_start..].chars().position(|x| x.is_whitespace()) {
-        // let id_end = if let Some(pos) = data.chars().skip(id_start).position(|x| x.is_whitespace())
-        let id_byte_end = if let Some((pos, _)) = data[id_byte_start..].char_indices().find(|(_, x)| x.is_whitespace())
-        {
-            pos + id_byte_start
-        } else {
-            data.len()
-        };
+        let trimmed = data.trim();
+        let id_byte_end = trimmed.len() + id_byte_start;
         let id_char_start = &data[..id_byte_start].chars().count();
         let id_char_end = &data[..id_byte_end].chars().count();
         word = Some(TokenData::new(
@@ -927,6 +917,10 @@ mod test {
         #[test]
         fn ok_invalid_dyn_array() {
             run_ok_simple("myarr", "cat", Some(""));
+        }
+        #[test]
+        fn ok_invalid_space_in_ident() {
+            run_ok_simple("foo bar", "u8", None)
         }
         #[test]
         fn ok_valid_dyn_array() {
