@@ -95,7 +95,6 @@ impl fmt::Display for ElucidatorError {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ParsingFailure {
-    NonAsciiEncoding,
     MissingIdSpecDelimiter,
     UnexpectedEndOfExpression,
 }
@@ -103,7 +102,6 @@ pub enum ParsingFailure {
 impl fmt::Display for ParsingFailure {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let m = match self {
-            Self::NonAsciiEncoding => { "Non ASCII encoding".to_string() },
             Self::MissingIdSpecDelimiter => {
                 "Missing delimeter : between identifier and type specification".to_string()
             },

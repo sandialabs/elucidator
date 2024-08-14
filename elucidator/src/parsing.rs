@@ -269,24 +269,6 @@ pub fn get_metadataspec<'a>(data: &'a str) -> MetadataSpecParserOutput<'a> {
     }
 }
 
-// TODO: REMOVE
-pub fn validate_identifier(_: &str) -> Result<()> {
-    unimplemented!();
-}
-
-pub fn is_valid_identifier_char(_: char) -> bool {
-    unimplemented!();
-}
-
-pub fn ascii_trimmed_or_err(_: &str) -> Result<&str> {
-    unimplemented!();
-}
-
-pub fn validated_trimmed_or_err(_: &str) -> Result<&str> {
-    unimplemented!();
-}
-
-
 #[cfg(test)]
 mod test {
     use super::*;
