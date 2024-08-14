@@ -22,8 +22,8 @@ pub(crate) struct DtypeParserOutput<'a> {
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct SizingParserOutput<'a> {
-    sizing: Option<SizingToken<'a>>,
-    errors: Vec<ElucidatorError>,
+    pub sizing: Option<SizingToken<'a>>,
+    pub errors: Vec<ElucidatorError>,
 }
 #[derive(Debug, PartialEq)]
 pub(crate) struct TypeSpecParserOutput<'a> {

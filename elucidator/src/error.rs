@@ -96,33 +96,21 @@ impl fmt::Display for ElucidatorError {
 #[derive(Debug, PartialEq, Clone)]
 pub enum ParsingFailure {
     NonAsciiEncoding,
-    IllegalCharacters(Vec<char>),
     MissingIdSpecDelimiter,
     UnexpectedEndOfExpression,
-    IllegalArraySizing,
 }
 
 impl fmt::Display for ParsingFailure {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let m = match self {
             Self::NonAsciiEncoding => { "Non ASCII encoding".to_string() },
-            Self::IllegalCharacters(clist) => {
-                let offending_list = clist
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ");
-                format!("Illegal characters encountered: {offending_list}")
-            },
             Self::MissingIdSpecDelimiter => {
                 "Missing delimeter : between identifier and type specification".to_string()
             },
             Self::UnexpectedEndOfExpression => {
                 "Unexpected end of expression".to_string()
             },
-            Self::IllegalArraySizing => {
-                "The size of the array is not valid; valid sizes must be unsigned integers or empty".to_string()
-            }
+
         };
         write!(f, "{m}")
     }
@@ -134,6 +122,7 @@ pub enum SpecificationFailure {
     IdentifierStartsNonAlphabetical,
     IllegalDataType,
     ZeroLengthIdentifier,
+    IllegalArraySizing,
     IllegalCharacters(Vec<char>),
 }
 
@@ -158,6 +147,9 @@ impl fmt::Display for SpecificationFailure {
                     .join(", ");
                 format!("Illegal characters encountered: {offending_list}")
             },
+            Self::IllegalArraySizing => {
+                "The size of the array is not valid; valid sizes must be unsigned integers or empty".to_string()
+            }
         };
         write!(f, "{m}")
     }

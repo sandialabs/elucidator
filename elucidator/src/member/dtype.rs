@@ -29,7 +29,7 @@ fn buff_size_or_err<T>(buffer: &[u8]) -> Result<usize, ElucidatorError> {
 
 impl Dtype {
     pub fn from(s: &str) -> Result<Dtype, ElucidatorError> {
-        let dt = match parsing::ascii_trimmed_or_err(s)? {
+        let dt = match s.trim() {
             "u8" => Self::Byte,
             "u16" => Self::UnsignedInteger16,
             "u32" => Self::UnsignedInteger32,
@@ -299,25 +299,11 @@ mod tests {
         let value = dt.from_buffer(&buffer);
         assert_eq!(value.err().unwrap(), ElucidatorError::FromUtf8 { source: utf8_error });
     }
-
-    #[test]
-    fn dtype_non_ascii_str() {
-        let crab_emoji = String::from('\u{1F980}');
-        assert_eq!(
-            Dtype::from(&crab_emoji),
-            Err(
-                ElucidatorError::Parsing {
-                    offender: crab_emoji,
-                    reason: ParsingFailure::NonAsciiEncoding,
-                }
-            )
-        );
-    }
     #[test]
     fn dtype_illegal_dtype() {
-        let invalid_dtype = "e32";
+        let invalid_dtype = String::from('\u{1F980}');
         assert_eq!(
-            Dtype::from(invalid_dtype),
+            Dtype::from(&invalid_dtype),
             Err(
                 ElucidatorError::IllegalSpecification{
                     offender: invalid_dtype.to_string(),
