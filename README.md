@@ -17,7 +17,7 @@ From here on, "The Standard" is an abbreviation of "The Elucidation Metadata Sta
 - `Group` is a set of `Metadata Specification`s, often particular to a project or domain.
 - `Specification` is the association of some `Identifier` with some set of rules for interpretation.
 - `Identifier` is the string which is associated with some set of rules about how something should be interpreted.
-  Identifiers must be ASCII-encoded alphanumerical or underscore characters, beginning with an alphabetical character.
+  Identifiers must be UTF-8 encoded alphanumerical or underscore characters, beginning with an alphabetical character.
 - `Interpreter` is a routine which can convert an individual `Metadatum` into the correct associated types.
 - `Metadata Specification` is the `Specification` of a Metadata `Designation` and its associated, ordered `Member`s.
 - `Designation` is the `Identifier` associated with a particular class of `Metadata`.

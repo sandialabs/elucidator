@@ -2,48 +2,72 @@ use crate::{error::*, token::*};
 
 type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct WordParserOutput<'a> {
     word: Option<TokenData<'a>>,
     errors: Vec<ElucidatorError>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct IdentifierParserOutput<'a> {
     pub identifier: Option<IdentifierToken<'a>>,
     pub errors: Vec<ElucidatorError>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct DtypeParserOutput<'a> {
     pub dtype: Option<DtypeToken<'a>>,
     pub errors: Vec<ElucidatorError>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct SizingParserOutput<'a> {
     pub sizing: Option<SizingToken<'a>>,
     pub errors: Vec<ElucidatorError>,
 }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct TypeSpecParserOutput<'a> {
-    dtype: Option<DtypeToken<'a>>,
-    sizing: Option<SizingToken<'a>>,
-    errors: Vec<ElucidatorError>,
-    is_singleton: bool,
+    pub dtype: Option<DtypeToken<'a>>,
+    pub sizing: Option<SizingToken<'a>>,
+    pub errors: Vec<ElucidatorError>,
+    pub is_singleton: bool,
 }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct MemberSpecParserOutput<'a> {
-    identifier: Option<IdentifierToken<'a>>,
-    dtype: Option<DtypeToken<'a>>,
-    sizing: Option<SizingToken<'a>>,
-    errors: Vec<ElucidatorError>,
+    pub identifier: Option<IdentifierToken<'a>>,
+    pub typespec: Option<TypeSpecParserOutput<'a>>,
+    pub errors: Vec<ElucidatorError>,
 }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct MetadataSpecParserOutput<'a> {
     member_outputs: Vec<MemberSpecParserOutput<'a>>,
     errors: Vec<ElucidatorError>,
 }
+
+impl<'a> MemberSpecParserOutput<'a> {
+    pub fn has_ident(&self) -> bool {
+        self.identifier.is_some()
+    }
+
+    pub fn has_dtype(&self) -> bool {
+        match &self.typespec {
+            Some(ts) => {
+                ts.dtype.is_some()
+            },
+            None => { false }
+        }
+    }
+
+    pub fn has_sizing(&self) -> bool {
+        match &self.typespec {
+            Some(ts) => {
+                ts.sizing.is_some() || ts.is_singleton
+            },
+            None => { false }
+        }
+    }
+}
+
 
 pub fn get_identifier<'a>(data: &'a str, start_col: usize) -> IdentifierParserOutput {
     let word_output = get_word(data, start_col);
@@ -198,8 +222,7 @@ pub fn get_typespec<'a>(data: &'a str, start_col: usize) -> TypeSpecParserOutput
 
 pub fn get_memberspec<'a>(data: &'a str, start_col: usize) -> MemberSpecParserOutput<'a> {
     let mut identifier = None;
-    let mut dtype = None;
-    let mut sizing = None;
+    let mut typespec = None;
     let mut errors = Vec::new();
 
     if let Some((left_of_colon, right_of_colon)) = data.split_once(":") {
@@ -212,11 +235,10 @@ pub fn get_memberspec<'a>(data: &'a str, start_col: usize) -> MemberSpecParserOu
         }
         // TypeSpec parsing
         let tso = get_typespec(right_of_colon, start_col + colon_pos + 1);
-        dtype = tso.dtype;
-        sizing = tso.sizing;
         for error in &tso.errors {
             errors.push(error.clone());
         }
+        typespec = Some(tso);
     } else {
         errors.push(
             ElucidatorError::Parsing {
@@ -228,8 +250,7 @@ pub fn get_memberspec<'a>(data: &'a str, start_col: usize) -> MemberSpecParserOu
 
     MemberSpecParserOutput {
         identifier,
-        dtype,
-        sizing,
+        typespec,
         errors,
     }
 }
@@ -780,8 +801,8 @@ mod test {
             } else { None };
 
             pretty_assertions::assert_eq!(output.identifier, Some(t_identifier));
-            pretty_assertions::assert_eq!(output.dtype, Some(t_dtype));
-            pretty_assertions::assert_eq!(output.sizing, t_sizing);
+            pretty_assertions::assert_eq!(output.typespec.clone().unwrap().dtype, Some(t_dtype));
+            pretty_assertions::assert_eq!(output.typespec.clone().unwrap().sizing, t_sizing);
             assert!(output.errors.is_empty());
         }
 
@@ -850,8 +871,8 @@ mod test {
             } else { None };
 
             pretty_assertions::assert_eq!(output.identifier, Some(t_identifier));
-            pretty_assertions::assert_eq!(output.dtype, Some(t_dtype));
-            pretty_assertions::assert_eq!(output.sizing, t_sizing);
+            pretty_assertions::assert_eq!(output.typespec.clone().unwrap().dtype, Some(t_dtype));
+            pretty_assertions::assert_eq!(output.typespec.clone().unwrap().sizing, t_sizing);
             assert!(output.errors.is_empty());
         }
 
@@ -921,8 +942,7 @@ mod test {
                 member_spec,
                 MemberSpecParserOutput {
                     identifier: None,
-                    dtype: None,
-                    sizing: None,
+                    typespec: None,
                     errors: vec![
                         ElucidatorError::Parsing {
                             offender: "foo u8".to_string(),

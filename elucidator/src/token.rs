@@ -12,7 +12,7 @@
 /// # assert_eq!(td_cat.data, "cat");
 /// # assert_eq!(td_dog.data, "dog");
 /// ```
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct TokenData<'a> {
     pub data: &'a str,
     pub column_start: usize,
@@ -31,22 +31,22 @@ impl<'a> TokenData<'a> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct IdentifierToken<'a> {
     pub data: TokenData<'a>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct DtypeToken<'a> {
     pub data: TokenData<'a>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct SizingToken<'a> {
     pub data: TokenData<'a>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct DelimiterToken<'a> {
     pub data: TokenData<'a>,
 }

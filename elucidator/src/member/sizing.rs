@@ -11,7 +11,7 @@
 /// assert_eq!(fixed_size, Sizing::Fixed(10));
 /// assert_eq!(dynamic_size, Sizing::Dynamic);
 /// ```
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[non_exhaustive]
 pub enum Sizing {
     Singleton,

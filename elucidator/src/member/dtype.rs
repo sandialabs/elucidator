@@ -1,9 +1,8 @@
 use crate::error::*;
-use crate::parsing;
 use crate::Representable;
 
 /// Possible Data Types allowed in The Elucidation Metadata Standard, most composable as arrays.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[non_exhaustive]
 pub enum Dtype {
     Byte,

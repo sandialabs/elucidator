@@ -1,6 +1,9 @@
-use crate::member::{Dtype, Sizing};
-use crate::{error::*};
-use crate::parsing::{DtypeParserOutput, IdentifierParserOutput, SizingParserOutput};
+use std::error;
+
+use crate::member::{Dtype, Sizing, MemberSpecification};
+use crate::token::{DtypeToken, IdentifierToken, SizingToken};
+use crate::{error::*, Representable};
+use crate::parsing::{DtypeParserOutput, IdentifierParserOutput, MemberSpecParserOutput, SizingParserOutput, TypeSpecParserOutput};
 
 type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
 
@@ -8,15 +11,9 @@ fn valid_identifier_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
 }
 
-pub fn validate_identifier(ipo: &IdentifierParserOutput) -> Result<String> {
+pub fn validate_identifier(itoken: &IdentifierToken) -> Result<String> {
     let mut errors: Vec<ElucidatorError> = Vec::new();
-    if !ipo.errors.is_empty() {
-        Err(ElucidatorError::merge(&ipo.errors))?
-    }
-    if ipo.identifier.is_none() {
-        unreachable!("Could not validate identifier: no errors found, but no identifier found either.");
-    }
-    let identifier = ipo.identifier.as_ref().unwrap().data.data;
+    let identifier = itoken.data.data;
     match &identifier.chars().nth(0) {
         None => {
             errors.push(ElucidatorError::IllegalSpecification { 
@@ -55,45 +52,95 @@ pub fn validate_identifier(ipo: &IdentifierParserOutput) -> Result<String> {
     }
 }
 
-pub fn validate_dtype(dpo: &DtypeParserOutput) -> Result<Dtype> {
-    if !dpo.errors.is_empty() {
-        Err(ElucidatorError::merge(&dpo.errors))?
-    }
-    match &dpo.dtype {
-        None => {
-            unreachable!("Could not validate dtype: no errors found, but no dtype found either.")
-        },
-        Some(dtoken) => {
-            Dtype::from(dtoken.data.data)
-        }
-    }
+pub fn validate_dtype(dtoken: &DtypeToken) -> Result<Dtype> {
+    Dtype::from(dtoken.data.data)
 }
 
 
-pub fn validate_sizing(spo: &SizingParserOutput) -> Result<Sizing, ElucidatorError> {
-    if !spo.errors.is_empty() {
-        Err(ElucidatorError::merge(&spo.errors))?;
+pub fn validate_sizing(stoken: &SizingToken) -> Result<Sizing, ElucidatorError> {
+    let data = stoken.data.data;
+    let trimmed_data = data.trim();
+    if trimmed_data.is_empty() {
+        return Ok(Sizing::Dynamic);
     }
-    match &spo.sizing {
-        None => {
-            unreachable!("Could not validate sizing: no errors found, but no sizing found either.")
-        },
-        Some(stoken) => {
-            let data = stoken.data.data;
-            let trimmed_data = data.trim();
-            if trimmed_data.is_empty() {
-                return Ok(Sizing::Dynamic);
+    match data.parse::<u64>() {
+        Ok(0) | Err(_) => {Err(
+            ElucidatorError::IllegalSpecification { 
+                offender: data.to_string(),
+                reason: SpecificationFailure::IllegalArraySizing 
             }
-            match data.parse::<u64>() {
-                Ok(0) | Err(_) => {Err(
-                    ElucidatorError::IllegalSpecification { 
-                        offender: data.to_string(),
-                        reason: SpecificationFailure::IllegalArraySizing 
-                    }
-                )},
-                Ok(v) => {Ok(Sizing::Fixed(v))},
-            }
+        )},
+        Ok(v) => {Ok(Sizing::Fixed(v))},
+    }
+}
+
+pub fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<MemberSpecification, ElucidatorError> {
+    let mut errors: Vec<ElucidatorError> = mpo.errors.clone();
+
+    let ident = if mpo.has_ident() {
+        match validate_identifier(&mpo.identifier.clone().unwrap()) {
+            Ok(o) => { Some(o) },
+            Err(e) => { 
+                errors.push(e);
+                None
+            },
+        } 
+    } else {
+        None
+    };
+
+    let dtype = if mpo.has_dtype() {
+        match validate_dtype(&mpo.typespec.clone().unwrap().dtype.unwrap()) {
+            Ok(o) => { Some(o) },
+            Err(e) => { 
+                errors.push(e);
+                None
+            },
+        }  
+    } else {
+        None
+    };
+
+    let sizing = if mpo.has_sizing() {
+        let typespec = mpo.typespec.clone().unwrap();
+        match &typespec.sizing {
+            Some(stoken) => { 
+                match validate_sizing(&stoken) {
+                    Ok(o) => { Some(o) },
+                    Err(e) => { 
+                        errors.push(e);
+                        None 
+                    },
+                }
+            },
+            None => { Some(Sizing::Singleton) },
+        }  
+    } else {
+        None
+    };
+
+    if ident.is_some() && dtype.is_some() && sizing.is_some() {
+        if !errors.is_empty() {
+            unreachable!("Parsed and validated MemberSpecification, but errors were also found.");
         }
+        if dtype.clone().unwrap() == Dtype::Str && sizing.clone().unwrap() != Sizing::Singleton {
+            errors.push(
+                ElucidatorError::IllegalSpecification {
+                    offender: ident.clone().unwrap(),
+                    reason: SpecificationFailure::IllegalArraySizing,
+                }
+            );
+            Err(ElucidatorError::merge(&errors)) 
+        }
+        else {
+            Ok(MemberSpecification::from_parts(
+                &ident.unwrap(), 
+                &sizing.unwrap(), 
+                &dtype.unwrap())
+            )
+        }
+    } else {
+        Err(ElucidatorError::merge(&errors))
     }
 }
 
@@ -110,7 +157,7 @@ mod tests {
         fn valid_ident_ok() {
             let ident_text = "foo10";
             let ipo = parsing::get_identifier(ident_text, 0);
-            let ident = validating::validate_identifier(&ipo);
+            let ident = validating::validate_identifier(&ipo.identifier.unwrap());
             assert_eq!(ident, Ok("foo10".to_string()));
         }
 
@@ -118,7 +165,7 @@ mod tests {
         fn valid_ident_whitespace_ok() {
             let ident_text = "  foo10  ";
             let ipo = parsing::get_identifier(ident_text, 0);
-            let ident = validating::validate_identifier(&ipo);
+            let ident = validating::validate_identifier(&ipo.identifier.unwrap());
             assert_eq!(ident, Ok("foo10".to_string()));
         }
 
@@ -126,7 +173,7 @@ mod tests {
         fn invalid_ident_err() {
             let ident_text = "5foo  ";
             let ipo = parsing::get_identifier(ident_text, 0);
-            let ident = validating::validate_identifier(&ipo);
+            let ident = validating::validate_identifier(&ipo.identifier.unwrap());
             assert_eq!(
                 ident,
                 Err(ElucidatorError::IllegalSpecification {
@@ -140,7 +187,7 @@ mod tests {
         fn invalid_whitespace_in_ident() {
             let ident_text = " foo \r\n\u{85}bar()\t";
             let ipo = parsing::get_identifier(ident_text, 0);
-            let ident = validating::validate_identifier(&ipo);
+            let ident = validating::validate_identifier(&ipo.identifier.unwrap());
             pretty_assertions::assert_eq!(
                 ident,
                 Err(ElucidatorError::IllegalSpecification {
@@ -158,7 +205,7 @@ mod tests {
         fn u8_ok() {
             let text = "u8";
             let dpo = parsing::get_dtype(text, 0);
-            let dtype = validating::validate_dtype(&dpo);
+            let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
             pretty_assertions::assert_eq!(
                 dtype,
                 Ok(Dtype::Byte)
@@ -168,7 +215,7 @@ mod tests {
         fn u16_ok() {
             let text = "u16";
             let dpo = parsing::get_dtype(text, 0);
-            let dtype = validating::validate_dtype(&dpo);
+            let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
             pretty_assertions::assert_eq!(
                 dtype,
                 Ok(Dtype::UnsignedInteger16)
@@ -178,7 +225,7 @@ mod tests {
         fn u32_ok() {
             let text = "u32";
             let dpo = parsing::get_dtype(text, 0);
-            let dtype = validating::validate_dtype(&dpo);
+            let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
             pretty_assertions::assert_eq!(
                 dtype,
                 Ok(Dtype::UnsignedInteger32)
@@ -188,7 +235,7 @@ mod tests {
         fn u64_ok() {
             let text = "u64";
             let dpo = parsing::get_dtype(text, 0);
-            let dtype = validating::validate_dtype(&dpo);
+            let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
             pretty_assertions::assert_eq!(
                 dtype,
                 Ok(Dtype::UnsignedInteger64)
@@ -198,7 +245,7 @@ mod tests {
         fn i8_ok() {
             let text = "i8";
             let dpo = parsing::get_dtype(text, 0);
-            let dtype = validating::validate_dtype(&dpo);
+            let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
             pretty_assertions::assert_eq!(
                 dtype,
                 Ok(Dtype::SignedInteger8)
@@ -208,7 +255,7 @@ mod tests {
         fn i16_ok() {
             let text = "i16";
             let dpo = parsing::get_dtype(text, 0);
-            let dtype = validating::validate_dtype(&dpo);
+            let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
             pretty_assertions::assert_eq!(
                 dtype,
                 Ok(Dtype::SignedInteger16)
@@ -218,7 +265,7 @@ mod tests {
         fn i32_ok() {
             let text = "i32";
             let dpo = parsing::get_dtype(text, 0);
-            let dtype = validating::validate_dtype(&dpo);
+            let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
             pretty_assertions::assert_eq!(
                 dtype,
                 Ok(Dtype::SignedInteger32)
@@ -228,7 +275,7 @@ mod tests {
         fn i64_ok() {
             let text = "i64";
             let dpo = parsing::get_dtype(text, 0);
-            let dtype = validating::validate_dtype(&dpo);
+            let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
             pretty_assertions::assert_eq!(
                 dtype,
                 Ok(Dtype::SignedInteger64)
@@ -238,7 +285,7 @@ mod tests {
         fn f32_ok() {
             let text = "f32";
             let dpo = parsing::get_dtype(text, 0);
-            let dtype = validating::validate_dtype(&dpo);
+            let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
             pretty_assertions::assert_eq!(
                 dtype,
                 Ok(Dtype::Float32)
@@ -248,7 +295,7 @@ mod tests {
         fn f64_ok() {
             let text = "f64";
             let dpo = parsing::get_dtype(text, 0);
-            let dtype = validating::validate_dtype(&dpo);
+            let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
             pretty_assertions::assert_eq!(
                 dtype,
                 Ok(Dtype::Float64)
@@ -258,7 +305,7 @@ mod tests {
         fn string_ok() {
             let text = "string";
             let dpo = parsing::get_dtype(text, 0);
-            let dtype = validating::validate_dtype(&dpo);
+            let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
             pretty_assertions::assert_eq!(
                 dtype,
                 Ok(Dtype::Str)
@@ -317,7 +364,7 @@ mod tests {
         fn dynamic_ok() {
             let text = "";
             let spo = parsing::get_sizing(text, 0);
-            let sizing = validating::validate_sizing(&spo);
+            let sizing = validating::validate_sizing(&spo.sizing.unwrap());
             pretty_assertions::assert_eq!(
                 sizing,
                 Ok(Sizing::Dynamic)
@@ -329,7 +376,7 @@ mod tests {
         fn dynamic_whitespace_ok() {
             let text = "  \u{85}";
             let spo = parsing::get_sizing(text, 0);
-            let sizing = validating::validate_sizing(&spo);
+            let sizing = validating::validate_sizing(&spo.sizing.unwrap());
             pretty_assertions::assert_eq!(
                 sizing,
                 Ok(Sizing::Dynamic)
@@ -340,7 +387,7 @@ mod tests {
         fn fixed_ok() {
             let text = "10";
             let spo = parsing::get_sizing(text, 0);
-            let sizing = validating::validate_sizing(&spo);
+            let sizing = validating::validate_sizing(&spo.sizing.unwrap());
             pretty_assertions::assert_eq!(
                 sizing,
                 Ok(Sizing::Fixed(10))
@@ -352,7 +399,7 @@ mod tests {
         fn fixed_whitespace_ok() {
             let text = "  10\u{85}";
             let spo = parsing::get_sizing(text, 0);
-            let sizing = validating::validate_sizing(&spo);
+            let sizing = validating::validate_sizing(&spo.sizing.unwrap());
             pretty_assertions::assert_eq!(
                 sizing,
                 Ok(Sizing::Fixed(10))
@@ -363,7 +410,7 @@ mod tests {
         fn fixed_zero() {
             let text = "0";
             let spo = parsing::get_sizing(text, 0);
-            let sizing = validating::validate_sizing(&spo);
+            let sizing = validating::validate_sizing(&spo.sizing.unwrap());
             pretty_assertions::assert_eq!(
                 sizing,
                 Err(ElucidatorError::IllegalSpecification {
@@ -376,7 +423,7 @@ mod tests {
         fn fixed_negative_fails() {
             let text = "-10";
             let spo = parsing::get_sizing(text, 0);
-            let sizing = validating::validate_sizing(&spo);
+            let sizing = validating::validate_sizing(&spo.sizing.unwrap());
             pretty_assertions::assert_eq!(
                 sizing,
                 Err(ElucidatorError::IllegalSpecification { 
@@ -390,7 +437,7 @@ mod tests {
         fn fixed_text_fails() {
             let text = "foobar";
             let spo = parsing::get_sizing(text, 0);
-            let sizing = validating::validate_sizing(&spo);
+            let sizing = validating::validate_sizing(&spo.sizing.unwrap());
             pretty_assertions::assert_eq!(
                 sizing,
                 Err(ElucidatorError::IllegalSpecification { 
