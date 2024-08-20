@@ -5,25 +5,25 @@ use crate::token::{DtypeToken, IdentifierToken, SizingToken};
 use crate::{error::*, Representable};
 use crate::parsing::{DtypeParserOutput, IdentifierParserOutput, MemberSpecParserOutput, SizingParserOutput, TypeSpecParserOutput};
 
-type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
+type Result<T, E = InternalError> = std::result::Result<T, E>;
 
 fn valid_identifier_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
 }
 
 pub fn validate_identifier(itoken: &IdentifierToken) -> Result<String> {
-    let mut errors: Vec<ElucidatorError> = Vec::new();
+    let mut errors: Vec<InternalError> = Vec::new();
     let identifier = itoken.data.data;
     match &identifier.chars().nth(0) {
         None => {
-            errors.push(ElucidatorError::IllegalSpecification { 
+            errors.push(InternalError::IllegalSpecification { 
                 offender: identifier.to_string(), 
                 reason: SpecificationFailure::ZeroLengthIdentifier
             });
         }
         Some(c) => {
             if !c.is_alphabetic() {
-                errors.push(ElucidatorError::IllegalSpecification { 
+                errors.push(InternalError::IllegalSpecification { 
                     offender: identifier.to_string(), 
                     reason: SpecificationFailure::IdentifierStartsNonAlphabetical
                 });
@@ -39,7 +39,7 @@ pub fn validate_identifier(itoken: &IdentifierToken) -> Result<String> {
     illegal_chars.dedup();
     if illegal_chars.len() > 0 {
         errors.push(
-            ElucidatorError::IllegalSpecification { 
+            InternalError::IllegalSpecification { 
                 offender: identifier.to_string(), 
                 reason: SpecificationFailure::IllegalCharacters(illegal_chars)
             }
@@ -48,16 +48,38 @@ pub fn validate_identifier(itoken: &IdentifierToken) -> Result<String> {
     if errors.is_empty() {
         Ok(identifier.to_string())
     } else {
-        Err(ElucidatorError::merge(&errors))
+        Err(InternalError::merge(&errors))
     }
 }
 
 pub fn validate_dtype(dtoken: &DtypeToken) -> Result<Dtype> {
-    Dtype::from(dtoken.data.data)
+    let s = dtoken.data.data;
+    let dt = match s.trim() {
+        "u8" => Dtype::Byte,
+        "u16" => Dtype::UnsignedInteger16,
+        "u32" => Dtype::UnsignedInteger32,
+        "u64" => Dtype::UnsignedInteger64,
+        "i8"  => Dtype::SignedInteger8,
+        "i16" => Dtype::SignedInteger16,
+        "i32" => Dtype::SignedInteger32,
+        "i64" => Dtype::SignedInteger64,
+        "f32" => Dtype::Float32,
+        "f64" => Dtype::Float64,
+        "string" => Dtype::Str,
+        ss => {
+            Err(
+                InternalError::IllegalSpecification{
+                    offender: ss.to_string(),
+                    reason: SpecificationFailure::IllegalDataType,
+                }   
+            )?  
+        },  
+    };  
+    Ok(dt)
 }
 
 
-pub fn validate_sizing(stoken: &SizingToken) -> Result<Sizing, ElucidatorError> {
+pub fn validate_sizing(stoken: &SizingToken) -> Result<Sizing, InternalError> {
     let data = stoken.data.data;
     let trimmed_data = data.trim();
     if trimmed_data.is_empty() {
@@ -65,7 +87,7 @@ pub fn validate_sizing(stoken: &SizingToken) -> Result<Sizing, ElucidatorError> 
     }
     match data.parse::<u64>() {
         Ok(0) | Err(_) => {Err(
-            ElucidatorError::IllegalSpecification { 
+            InternalError::IllegalSpecification { 
                 offender: data.to_string(),
                 reason: SpecificationFailure::IllegalArraySizing 
             }
@@ -74,8 +96,8 @@ pub fn validate_sizing(stoken: &SizingToken) -> Result<Sizing, ElucidatorError> 
     }
 }
 
-pub fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<MemberSpecification, ElucidatorError> {
-    let mut errors: Vec<ElucidatorError> = mpo.errors.clone();
+pub fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<MemberSpecification, InternalError> {
+    let mut errors: Vec<InternalError> = mpo.errors.clone();
 
     let ident = if mpo.has_ident() {
         match validate_identifier(&mpo.identifier.clone().unwrap()) {
@@ -125,12 +147,12 @@ pub fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<MemberSpecifi
         }
         if dtype.clone().unwrap() == Dtype::Str && sizing.clone().unwrap() != Sizing::Singleton {
             errors.push(
-                ElucidatorError::IllegalSpecification {
+                InternalError::IllegalSpecification {
                     offender: ident.clone().unwrap(),
                     reason: SpecificationFailure::IllegalArraySizing,
                 }
             );
-            Err(ElucidatorError::merge(&errors)) 
+            Err(InternalError::merge(&errors)) 
         }
         else {
             Ok(MemberSpecification::from_parts(
@@ -140,7 +162,7 @@ pub fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<MemberSpecifi
             )
         }
     } else {
-        Err(ElucidatorError::merge(&errors))
+        Err(InternalError::merge(&errors))
     }
 }
 
@@ -176,7 +198,7 @@ mod tests {
             let ident = validating::validate_identifier(&ipo.identifier.unwrap());
             assert_eq!(
                 ident,
-                Err(ElucidatorError::IllegalSpecification {
+                Err(InternalError::IllegalSpecification {
                     offender: "5foo".to_string(),
                     reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                 })
@@ -190,7 +212,7 @@ mod tests {
             let ident = validating::validate_identifier(&ipo.identifier.unwrap());
             pretty_assertions::assert_eq!(
                 ident,
-                Err(ElucidatorError::IllegalSpecification {
+                Err(InternalError::IllegalSpecification {
                     offender: "foo \r\n\u{85}bar()".to_string(),
                     reason: SpecificationFailure::IllegalCharacters(vec!['\n', '\r', ' ', '(', ')', '\u{85}']),
                 })
@@ -200,6 +222,8 @@ mod tests {
 
     mod dtype {
         use super::*;
+
+        use crate::token::TokenData;
 
         #[test]
         fn u8_ok() {
@@ -314,10 +338,14 @@ mod tests {
         #[test]
         fn empty_string() {
             let text = "";
-            let dtype = Dtype::from(text);
+            let dtype = validating::validate_dtype(
+                & DtypeToken {
+                    data: TokenData::new(text, 0, 0)
+                }
+            );
             pretty_assertions::assert_eq!(
                 dtype,
-                Err(ElucidatorError::IllegalSpecification {
+                Err(InternalError::IllegalSpecification {
                     offender: text.to_string(),
                     reason: SpecificationFailure::IllegalDataType,
                 })
@@ -327,7 +355,9 @@ mod tests {
         #[test]
         fn leading_whitespace_ok() {
             let text = "\u{85}\tu8";
-            let dtype = Dtype::from(text);
+            let dtype = validating::validate_dtype(
+                &parsing::get_dtype(text, 0).dtype.unwrap()
+            );
             pretty_assertions::assert_eq!(
                 dtype,
                 Ok(Dtype::Byte)
@@ -337,7 +367,9 @@ mod tests {
         #[test]
         fn trailing_whitespace_ok() {
             let text = "u8   \u{85}";
-            let dtype = Dtype::from(text);
+            let dtype = validating::validate_dtype(
+                &parsing::get_dtype(text, 0).dtype.unwrap()
+            );
             pretty_assertions::assert_eq!(
                 dtype,
                 Ok(Dtype::Byte)
@@ -347,10 +379,12 @@ mod tests {
         #[test]
         fn null_character() {
             let text = "\0";
-            let dtype = Dtype::from(text);
+            let dtype = validating::validate_dtype(
+                &parsing::get_dtype(text, 0).dtype.unwrap()
+            );
             pretty_assertions::assert_eq!(
                 dtype,
-                Err(ElucidatorError::IllegalSpecification {
+                Err(InternalError::IllegalSpecification {
                     offender: text.to_string(),
                     reason: SpecificationFailure::IllegalDataType,
                 })
@@ -413,7 +447,7 @@ mod tests {
             let sizing = validating::validate_sizing(&spo.sizing.unwrap());
             pretty_assertions::assert_eq!(
                 sizing,
-                Err(ElucidatorError::IllegalSpecification {
+                Err(InternalError::IllegalSpecification {
                     offender: text.to_string(),
                     reason: SpecificationFailure::IllegalArraySizing
             }));
@@ -426,7 +460,7 @@ mod tests {
             let sizing = validating::validate_sizing(&spo.sizing.unwrap());
             pretty_assertions::assert_eq!(
                 sizing,
-                Err(ElucidatorError::IllegalSpecification { 
+                Err(InternalError::IllegalSpecification { 
                     offender: text.to_string(),
                     reason: SpecificationFailure::IllegalArraySizing,
                 })
@@ -440,7 +474,7 @@ mod tests {
             let sizing = validating::validate_sizing(&spo.sizing.unwrap());
             pretty_assertions::assert_eq!(
                 sizing,
-                Err(ElucidatorError::IllegalSpecification { 
+                Err(InternalError::IllegalSpecification { 
                     offender: text.to_string(),
                     reason: SpecificationFailure::IllegalArraySizing,
                 })
@@ -476,7 +510,7 @@ mod tests {
             pretty_assertions::assert_eq!(
                 member,
                 Err(
-                    ElucidatorError::IllegalSpecification{
+                    InternalError::IllegalSpecification{
                         offender: ident.to_string(),
                         reason: SpecificationFailure::IllegalArraySizing,
                     },
@@ -501,7 +535,7 @@ mod tests {
             pretty_assertions::assert_eq!(
                 member,
                 Err(
-                    ElucidatorError::Parsing{
+                    InternalError::Parsing{
                         offender: TokenClone::new("", 0),
                         reason: ParsingFailure::UnexpectedEndOfExpression,
                     }
@@ -518,7 +552,7 @@ mod tests {
             pretty_assertions::assert_eq!(
                 member,
                 Err(
-                    ElucidatorError::Parsing{
+                    InternalError::Parsing{
                         offender: TokenClone::new(" ", 4),
                         reason: ParsingFailure::UnexpectedEndOfExpression,
                     }
@@ -533,16 +567,16 @@ mod tests {
             let member = validating::validate_memberspec(&mpo);
             pretty_assertions::assert_eq!(
                 member,
-                Err(ElucidatorError::merge(&vec![
-                    ElucidatorError::Parsing{
+                Err(InternalError::merge(&vec![
+                    InternalError::Parsing{
                         offender: TokenClone::new("", 6),
                         reason: ParsingFailure::UnexpectedEndOfExpression,
                     },
-                    ElucidatorError::Parsing{
+                    InternalError::Parsing{
                         offender: TokenClone::new(" ", 5),
                         reason: ParsingFailure::UnexpectedEndOfExpression,
                     },
-                    ElucidatorError::IllegalSpecification{
+                    InternalError::IllegalSpecification{
                         offender: "5eva".to_string(),
                         reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                     },
@@ -557,12 +591,12 @@ mod tests {
             let member = validating::validate_memberspec(&mpo);
             pretty_assertions::assert_eq!(
                 member,
-                Err(ElucidatorError::merge(&vec![
-                    ElucidatorError::IllegalSpecification{
+                Err(InternalError::merge(&vec![
+                    InternalError::IllegalSpecification{
                         offender: "5eva".to_string(),
                         reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                     },
-                    ElucidatorError::IllegalSpecification{
+                    InternalError::IllegalSpecification{
                         offender: "cat".to_string(),
                         reason: SpecificationFailure::IllegalArraySizing,
                     },

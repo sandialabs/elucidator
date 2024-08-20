@@ -3,8 +3,6 @@ use crate::token::TokenClone;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ElucidatorError {
-    /// Errors related to parsing strings, see [`ParsingFailure`] for reasons parsing might fail
-    Parsing{offender: TokenClone, reason: ParsingFailure},
     /// Errors related to converting between incompatible types
     Conversion{from: String, to: String},
     /// Errors related to attempt to cast from high precision or range to low precision or range
@@ -13,10 +11,6 @@ pub enum ElucidatorError {
     BufferSizing{expected: usize, found: usize},
     /// Errors when parsing from UTF8
     FromUtf8{source: FromUtf8Error},
-    /// Errors related to illegal specification
-    IllegalSpecification{offender: String, reason: SpecificationFailure},
-    /// Multiple errors have occurred
-    MultipleFailures(Box<Vec<ElucidatorError>>),
 }
 
 impl ElucidatorError {
@@ -32,7 +26,40 @@ impl ElucidatorError {
             to: to.to_string(),
         })
     }
-    fn expand(&self) -> Vec<ElucidatorError> {
+}
+
+impl fmt::Display for ElucidatorError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let m = match self {
+            Self::Conversion{from, to} => {
+                format!("Cannot convert {from} to {to}")
+            },
+            Self::Narrowing{from, to} => {
+                format!("Conversion from {from} to {to} would cause narrowing")
+            },
+            Self::BufferSizing{expected, found} => {
+                format!("Buffer expected size of {expected} bytes, found {found} instead")
+            },
+            Self::FromUtf8{source} => {
+                format!("{source}")
+            },
+        };
+        write!(f, "{m}")
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum InternalError {
+    /// Errors related to parsing strings, see [`ParsingFailure`] for reasons parsing might fail
+    Parsing{offender: TokenClone, reason: ParsingFailure},
+    /// Errors related to illegal specification
+    IllegalSpecification{offender: String, reason: SpecificationFailure},
+    /// Multiple errors have occurred
+    MultipleFailures(Box<Vec<InternalError>>),
+}
+
+impl InternalError {
+    fn expand(&self) -> Vec<InternalError> {
         match &self {
             Self::MultipleFailures(errs) => {
                 errs.iter()
@@ -45,39 +72,27 @@ impl ElucidatorError {
             }
         }
     }
-    pub fn merge_with(left: &ElucidatorError, right: &ElucidatorError) -> ElucidatorError {
+    pub fn merge_with(left: &InternalError, right: &InternalError) -> InternalError {
         Self::merge(&vec![left.clone(), right.clone()])
     }
-    pub fn merge(errs: &Vec<ElucidatorError>) -> ElucidatorError {
-        let errors: Vec<ElucidatorError> = errs.iter()
-            .map(ElucidatorError::expand)
+    pub fn merge(errs: &Vec<InternalError>) -> InternalError {
+        let errors: Vec<InternalError> = errs.iter()
+            .map(InternalError::expand)
             .flatten()
             .collect();
         if errors.len() == 1 {
             errors[0].clone()
         } else {
-            ElucidatorError::MultipleFailures(Box::new(errors))
+            InternalError::MultipleFailures(Box::new(errors))
         }
     }
 }
 
-impl fmt::Display for ElucidatorError {
+impl fmt::Display for InternalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let m = match self {
             Self::Parsing{offender, reason} => {
                 format!("Failed to parse due to {reason}: {offender}")
-            },
-            Self::Conversion{from, to} => {
-                format!("Cannot convert {from} to {to}")
-            },
-            Self::Narrowing{from, to} => {
-                format!("Conversion from {from} to {to} would cause narrowing")
-            },
-            Self::BufferSizing{expected, found} => {
-                format!("Buffer expected size of {expected} bytes, found {found} instead")
-            },
-            Self::FromUtf8{source} => {
-                format!("{source}")
             },
             Self::IllegalSpecification{offender, reason} => {
                 format!("Illegal specification \"{offender}\": {reason}")
@@ -95,7 +110,7 @@ impl fmt::Display for ElucidatorError {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ParsingFailure {
+pub(crate) enum ParsingFailure {
     MissingIdSpecDelimiter,
     UnexpectedEndOfExpression,
 }
@@ -116,7 +131,7 @@ impl fmt::Display for ParsingFailure {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum SpecificationFailure {
+pub(crate) enum SpecificationFailure {
     RepeatedIdentifier,
     IdentifierStartsNonAlphabetical,
     IllegalDataType,

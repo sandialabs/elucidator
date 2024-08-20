@@ -27,30 +27,6 @@ fn buff_size_or_err<T>(buffer: &[u8]) -> Result<usize, ElucidatorError> {
 }
 
 impl Dtype {
-    pub fn from(s: &str) -> Result<Dtype, ElucidatorError> {
-        let dt = match s.trim() {
-            "u8" => Self::Byte,
-            "u16" => Self::UnsignedInteger16,
-            "u32" => Self::UnsignedInteger32,
-            "u64" => Self::UnsignedInteger64,
-            "i8"  => Self::SignedInteger8,
-            "i16" => Self::SignedInteger16,
-            "i32" => Self::SignedInteger32,
-            "i64" => Self::SignedInteger64,
-            "f32" => Self::Float32,
-            "f64" => Self::Float64,
-            "string" => Self::Str,
-            ss => {
-                Err(
-                    ElucidatorError::IllegalSpecification{
-                        offender: ss.to_string(),
-                        reason: SpecificationFailure::IllegalDataType,
-                    }
-                )?
-            },
-        };
-        Ok(dt)
-    }
     pub fn from_buffer(&self, buffer: &[u8]) -> Result<Box<dyn Representable>, ElucidatorError> {
         match self {
             Self::Byte => {
@@ -146,23 +122,6 @@ impl Dtype {
 mod tests {
     use super::*;
     use std::collections::HashMap;
-
-    fn get_dtype_map() -> HashMap<&'static str, Result<Dtype, ElucidatorError>> {
-        HashMap::from([
-            ("u8",      Ok(Dtype::Byte)),
-            ("u16",     Ok(Dtype::UnsignedInteger16)),
-            ("u32",     Ok(Dtype::UnsignedInteger32)),
-            ("u64",     Ok(Dtype::UnsignedInteger64)),
-            ("i8",      Ok(Dtype::SignedInteger8)),
-            ("i16",     Ok(Dtype::SignedInteger16)),
-            ("i32",     Ok(Dtype::SignedInteger32)),
-            ("i64",     Ok(Dtype::SignedInteger64)),
-            ("f32",     Ok(Dtype::Float32)),
-            ("f64",     Ok(Dtype::Float64)),
-            ("string",  Ok(Dtype::Str))
-        ])
-    }
-
 
     #[test]
     fn get_u8_from_buffer() {
@@ -297,27 +256,5 @@ mod tests {
         let dt = Dtype::Str;
         let value = dt.from_buffer(&buffer);
         assert_eq!(value.err().unwrap(), ElucidatorError::FromUtf8 { source: utf8_error });
-    }
-    #[test]
-    fn dtype_illegal_dtype() {
-        let invalid_dtype = String::from('\u{1F980}');
-        assert_eq!(
-            Dtype::from(&invalid_dtype),
-            Err(
-                ElucidatorError::IllegalSpecification{
-                    offender: invalid_dtype.to_string(),
-                    reason: SpecificationFailure::IllegalDataType,
-                }
-            )
-        );
-
-    }
-    #[test]
-    fn dtype_all_parsed_correct() {
-        let result_map = get_dtype_map()
-            .keys()
-            .map(|x| {(*x, Dtype::from(x))})
-            .collect::<HashMap<&str, Result<Dtype, ElucidatorError>>>();
-        assert_eq!(result_map, get_dtype_map());
     }
 }

@@ -1,47 +1,47 @@
 use crate::{error::*, token::*};
 
-type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
+type Result<T, E = InternalError> = std::result::Result<T, E>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct WordParserOutput<'a> {
     word: Option<TokenData<'a>>,
-    errors: Vec<ElucidatorError>,
+    errors: Vec<InternalError>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct IdentifierParserOutput<'a> {
     pub identifier: Option<IdentifierToken<'a>>,
-    pub errors: Vec<ElucidatorError>,
+    pub errors: Vec<InternalError>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct DtypeParserOutput<'a> {
     pub dtype: Option<DtypeToken<'a>>,
-    pub errors: Vec<ElucidatorError>,
+    pub errors: Vec<InternalError>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct SizingParserOutput<'a> {
     pub sizing: Option<SizingToken<'a>>,
-    pub errors: Vec<ElucidatorError>,
+    pub errors: Vec<InternalError>,
 }
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct TypeSpecParserOutput<'a> {
     pub dtype: Option<DtypeToken<'a>>,
     pub sizing: Option<SizingToken<'a>>,
-    pub errors: Vec<ElucidatorError>,
+    pub errors: Vec<InternalError>,
     pub is_singleton: bool,
 }
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct MemberSpecParserOutput<'a> {
     pub identifier: Option<IdentifierToken<'a>>,
     pub typespec: Option<TypeSpecParserOutput<'a>>,
-    pub errors: Vec<ElucidatorError>,
+    pub errors: Vec<InternalError>,
 }
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct MetadataSpecParserOutput<'a> {
     member_outputs: Vec<MemberSpecParserOutput<'a>>,
-    errors: Vec<ElucidatorError>,
+    errors: Vec<InternalError>,
 }
 
 impl<'a> MemberSpecParserOutput<'a> {
@@ -136,7 +136,7 @@ pub fn get_word<'a>(data: &'a str, start_col: usize) -> WordParserOutput<'a> {
     let id_start = data.char_indices().find(|(_, x)| !x.is_whitespace());
     if id_start.is_none() {
         errors.push(
-            ElucidatorError::Parsing {
+            InternalError::Parsing {
                 offender: TokenClone::new(data, start_col),
                 reason: ParsingFailure::UnexpectedEndOfExpression,
             }
@@ -193,7 +193,7 @@ pub fn get_typespec<'a>(data: &'a str, start_col: usize) -> TypeSpecParserOutput
             None => {
                 sizing = None;
                 errors.push(
-                    ElucidatorError::Parsing {
+                    InternalError::Parsing {
                         offender: TokenClone::new(
                           &data[lbracket_byte_pos..],
                           start_col + lbracket_pos,
@@ -248,7 +248,7 @@ pub fn get_memberspec<'a>(data: &'a str, start_col: usize) -> MemberSpecParserOu
             None => start_col,
         };
         errors.push(
-            ElucidatorError::Parsing {
+            InternalError::Parsing {
                 offender: TokenClone::new(
                     data.to_string().trim(), start_non_whitespace
                 ),
@@ -265,7 +265,7 @@ pub fn get_memberspec<'a>(data: &'a str, start_col: usize) -> MemberSpecParserOu
 }
 
 pub fn get_metadataspec<'a>(data: &'a str) -> MetadataSpecParserOutput<'a> {
-    let errors: Vec<ElucidatorError>;
+    let errors: Vec<InternalError>;
     let member_outputs: Vec<MemberSpecParserOutput>; 
 
     let mut start_positions = data
@@ -448,7 +448,7 @@ mod test {
                 WordParserOutput{
                     word: None,
                     errors: vec![
-                        ElucidatorError::Parsing {
+                        InternalError::Parsing {
                             offender: TokenClone::new(text, 0),
                             reason: ParsingFailure::UnexpectedEndOfExpression
                         }
@@ -763,7 +763,7 @@ mod test {
                     sizing: None,
                     dtype: Some(dtoken),
                     errors: vec![
-                        ElucidatorError::Parsing {
+                        InternalError::Parsing {
                             offender: TokenClone::new(&sizing_body, 11),
                             reason: ParsingFailure::UnexpectedEndOfExpression }
                     ],
@@ -956,7 +956,7 @@ mod test {
                     identifier: None,
                     typespec: None,
                     errors: vec![
-                        ElucidatorError::Parsing {
+                        InternalError::Parsing {
                             offender: TokenClone::new("foo u8", 2),
                             reason: ParsingFailure::MissingIdSpecDelimiter
                         }
@@ -1086,7 +1086,7 @@ mod test {
                 .collect();
             pretty_assertions::assert_eq!(start_positions.len(), parsed_members.len());
             let metadata_spec = get_metadataspec(&spec);
-            let expected_errors: Vec<ElucidatorError> = parsed_members
+            let expected_errors: Vec<InternalError> = parsed_members
                 .iter()
                 .flat_map(|x| x.errors.iter())
                 .map(|x| x.clone())
