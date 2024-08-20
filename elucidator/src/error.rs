@@ -81,10 +81,18 @@ impl fmt::Display for ElucidatorError {
                 format!("{source}")
             },
             Self::Specification{context, column_start, column_end, reason} => {
-                todo!("Implement specification error display!");
+                let marking_line = (0..*column_end)
+                    .map(|x| if x < *column_start { ' ' } else { '^' })
+                    .collect::<String>();
+                let error_text = format!("ERROR: {reason}");
+                format!("{error_text}\n\t{context}\n\t{marking_line}\n")
             },
             Self::MultipleErrors(errs) => {
-                todo!("Implement multiple error display!");
+                errs
+                    .iter()
+                    .map(|x| format!("{x}"))
+                    .collect::<Vec<String>>()
+                    .join("\n")
             },
         };
         write!(f, "{m}")
@@ -96,7 +104,7 @@ pub(crate) enum InternalError {
     /// Errors related to parsing strings, see [`ParsingFailure`] for reasons parsing might fail
     Parsing{offender: TokenClone, reason: ParsingFailure},
     /// Errors related to illegal specification
-    IllegalSpecification{offender: String, reason: SpecificationFailure},
+    IllegalSpecification{offender: TokenClone, reason: SpecificationFailure},
     /// Multiple errors have occurred
     MultipleFailures(Box<Vec<InternalError>>),
 }

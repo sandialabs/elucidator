@@ -1,7 +1,7 @@
 use std::error;
 
 use crate::member::{Dtype, Sizing, MemberSpecification};
-use crate::token::{DtypeToken, IdentifierToken, SizingToken};
+use crate::token::{TokenClone, DtypeToken, IdentifierToken, SizingToken};
 use crate::{error::*, Representable};
 use crate::parsing::{DtypeParserOutput, IdentifierParserOutput, MemberSpecParserOutput, SizingParserOutput, TypeSpecParserOutput};
 
@@ -17,14 +17,14 @@ pub(crate) fn validate_identifier(itoken: &IdentifierToken) -> Result<String> {
     match &identifier.chars().nth(0) {
         None => {
             errors.push(InternalError::IllegalSpecification { 
-                offender: identifier.to_string(), 
+                offender: TokenClone::from_token_data(&itoken.data),
                 reason: SpecificationFailure::ZeroLengthIdentifier
             });
         }
         Some(c) => {
             if !c.is_alphabetic() {
                 errors.push(InternalError::IllegalSpecification { 
-                    offender: identifier.to_string(), 
+                    offender: TokenClone::from_token_data(&itoken.data),
                     reason: SpecificationFailure::IdentifierStartsNonAlphabetical
                 });
             }
@@ -40,7 +40,7 @@ pub(crate) fn validate_identifier(itoken: &IdentifierToken) -> Result<String> {
     if illegal_chars.len() > 0 {
         errors.push(
             InternalError::IllegalSpecification { 
-                offender: identifier.to_string(), 
+                offender: TokenClone::from_token_data(&itoken.data),
                 reason: SpecificationFailure::IllegalCharacters(illegal_chars)
             }
         );
@@ -69,7 +69,7 @@ pub(crate) fn validate_dtype(dtoken: &DtypeToken) -> Result<Dtype> {
         ss => {
             Err(
                 InternalError::IllegalSpecification{
-                    offender: ss.to_string(),
+                    offender: TokenClone::from_token_data(&dtoken.data),
                     reason: SpecificationFailure::IllegalDataType,
                 }   
             )?  
@@ -87,8 +87,8 @@ pub(crate) fn validate_sizing(stoken: &SizingToken) -> Result<Sizing> {
     }
     match data.parse::<u64>() {
         Ok(0) | Err(_) => {Err(
-            InternalError::IllegalSpecification { 
-                offender: data.to_string(),
+            InternalError::IllegalSpecification {
+                offender: TokenClone::from_token_data(&stoken.data),
                 reason: SpecificationFailure::IllegalArraySizing 
             }
         )},
@@ -148,7 +148,9 @@ pub(crate) fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<Member
         if dtype.clone().unwrap() == Dtype::Str && sizing.clone().unwrap() != Sizing::Singleton {
             errors.push(
                 InternalError::IllegalSpecification {
-                    offender: ident.clone().unwrap(),
+                    offender: TokenClone::from_token_data(
+                        &mpo.identifier.clone().unwrap().data
+                    ),
                     reason: SpecificationFailure::IllegalArraySizing,
                 }
             );
@@ -199,7 +201,7 @@ mod tests {
             assert_eq!(
                 ident,
                 Err(InternalError::IllegalSpecification {
-                    offender: "5foo".to_string(),
+                    offender: TokenClone::new(ident_text, 0),
                     reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                 })
             );
@@ -213,7 +215,7 @@ mod tests {
             pretty_assertions::assert_eq!(
                 ident,
                 Err(InternalError::IllegalSpecification {
-                    offender: "foo \r\n\u{85}bar()".to_string(),
+                    offender: TokenClone::new(ident_text.to_string().trim(), 1),
                     reason: SpecificationFailure::IllegalCharacters(vec!['\n', '\r', ' ', '(', ')', '\u{85}']),
                 })
             );
