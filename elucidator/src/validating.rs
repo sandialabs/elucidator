@@ -11,7 +11,7 @@ fn valid_identifier_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
 }
 
-pub fn validate_identifier(itoken: &IdentifierToken) -> Result<String> {
+pub(crate) fn validate_identifier(itoken: &IdentifierToken) -> Result<String> {
     let mut errors: Vec<InternalError> = Vec::new();
     let identifier = itoken.data.data;
     match &identifier.chars().nth(0) {
@@ -52,7 +52,7 @@ pub fn validate_identifier(itoken: &IdentifierToken) -> Result<String> {
     }
 }
 
-pub fn validate_dtype(dtoken: &DtypeToken) -> Result<Dtype> {
+pub(crate) fn validate_dtype(dtoken: &DtypeToken) -> Result<Dtype> {
     let s = dtoken.data.data;
     let dt = match s.trim() {
         "u8" => Dtype::Byte,
@@ -79,7 +79,7 @@ pub fn validate_dtype(dtoken: &DtypeToken) -> Result<Dtype> {
 }
 
 
-pub fn validate_sizing(stoken: &SizingToken) -> Result<Sizing, InternalError> {
+pub(crate) fn validate_sizing(stoken: &SizingToken) -> Result<Sizing> {
     let data = stoken.data.data;
     let trimmed_data = data.trim();
     if trimmed_data.is_empty() {
@@ -96,7 +96,7 @@ pub fn validate_sizing(stoken: &SizingToken) -> Result<Sizing, InternalError> {
     }
 }
 
-pub fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<MemberSpecification, InternalError> {
+pub(crate) fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<MemberSpecification, InternalError> {
     let mut errors: Vec<InternalError> = mpo.errors.clone();
 
     let ident = if mpo.has_ident() {

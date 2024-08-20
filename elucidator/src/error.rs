@@ -11,6 +11,15 @@ pub enum ElucidatorError {
     BufferSizing{expected: usize, found: usize},
     /// Errors when parsing from UTF8
     FromUtf8{source: FromUtf8Error},
+    /// Errors related to illegal or malformed specification
+    Specification{
+        context: String,
+        column_start: usize,
+        column_end: usize,
+        reason: String,
+    },
+    /// Multiple, simultaneous failures
+    MultipleErrors(Box<Vec<ElucidatorError>>),
 }
 
 impl ElucidatorError {
@@ -26,6 +35,34 @@ impl ElucidatorError {
             to: to.to_string(),
         })
     }
+    fn expand(&self) -> Vec<ElucidatorError> {
+        match &self {
+            Self::MultipleErrors(errs) => {
+                errs.iter()
+                    .map(|e| e.expand())
+                    .flatten()
+                    .collect()
+            },
+            _ => {
+                vec![self.clone()]
+            }
+        }
+    }
+    pub fn merge_with(left: &ElucidatorError, right: &ElucidatorError) -> ElucidatorError {
+        Self::merge(&vec![left.clone(), right.clone()])
+    }
+    pub fn merge(errs: &Vec<ElucidatorError>) -> ElucidatorError {
+        let errors: Vec<ElucidatorError> = errs.iter()
+            .map(ElucidatorError::expand)
+            .flatten()
+            .collect();
+        if errors.len() == 1 {
+            errors[0].clone()
+        } else {
+            ElucidatorError::MultipleErrors(Box::new(errors))
+        }
+    }
+
 }
 
 impl fmt::Display for ElucidatorError {
@@ -42,6 +79,12 @@ impl fmt::Display for ElucidatorError {
             },
             Self::FromUtf8{source} => {
                 format!("{source}")
+            },
+            Self::Specification{context, column_start, column_end, reason} => {
+                todo!("Implement specification error display!");
+            },
+            Self::MultipleErrors(errs) => {
+                todo!("Implement multiple error display!");
             },
         };
         write!(f, "{m}")
