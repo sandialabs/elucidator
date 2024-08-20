@@ -121,7 +121,7 @@ pub fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<MemberSpecifi
 
     if ident.is_some() && dtype.is_some() && sizing.is_some() {
         if !errors.is_empty() {
-            unreachable!("Parsed and validated MemberSpecification, but errors were also found.");
+            unreachable!("Parsed and validated MemberSpecification, but errors were also found: {:#?}", errors);
         }
         if dtype.clone().unwrap() == Dtype::Str && sizing.clone().unwrap() != Sizing::Singleton {
             errors.push(
@@ -147,7 +147,7 @@ pub fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<MemberSpecifi
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{parsing, validating};
+    use crate::{parsing, validating, token::TokenClone};
     use pretty_assertions;
 
     mod identifier {
@@ -447,7 +447,127 @@ mod tests {
             );
         }         
     }
-    mod type_spec {
+    mod memberspec {
         use super::*;
+
+        #[test]
+        fn singleton_ok() {
+            let text = "foo: u32";
+            let mpo = parsing::get_memberspec(text, 0);
+            let member = validating::validate_memberspec(&mpo);
+            pretty_assertions::assert_eq!(
+                member,
+                Ok(
+                    MemberSpecification::from_parts(
+                        "foo",
+                        &Sizing::Singleton,
+                        &Dtype::UnsignedInteger32,
+                    )
+                )
+            );
+        }
+
+        #[test]
+        fn string_non_singleton_err() {
+            let ident = "foo";
+            let text = &format!("{ident}: string[]");
+            let mpo = parsing::get_memberspec(text, 0);
+            let member = validating::validate_memberspec(&mpo);
+            pretty_assertions::assert_eq!(
+                member,
+                Err(
+                    ElucidatorError::IllegalSpecification{
+                        offender: ident.to_string(),
+                        reason: SpecificationFailure::IllegalArraySizing,
+                    },
+                )
+            );
+        }
+
+        #[test]
+        fn empty_err() {
+            let text = "";
+            let mpo = parsing::get_memberspec(text, 0);
+            let member = validating::validate_memberspec(&mpo);
+            assert!(member.is_err());
+        }
+
+        #[test]
+        fn ident_missing_err() {
+            let text = ": u32";
+            let mpo = parsing::get_memberspec(text, 0);
+            let member = validating::validate_memberspec(&mpo);
+            // TODO: convert this after error refactor for promoting EOE to ZeroLengthIdentifer
+            pretty_assertions::assert_eq!(
+                member,
+                Err(
+                    ElucidatorError::Parsing{
+                        offender: TokenClone::new("", 0),
+                        reason: ParsingFailure::UnexpectedEndOfExpression,
+                    }
+                )
+            )
+        }
+
+        #[test]
+        fn dtype_missing_err() {
+            let text = "foo: []";
+            let mpo = parsing::get_memberspec(text, 0);
+            let member = validating::validate_memberspec(&mpo);
+            // TODO: convert this after error refactor for promoting EOE to ZeroLengthIdentifer
+            pretty_assertions::assert_eq!(
+                member,
+                Err(
+                    ElucidatorError::Parsing{
+                        offender: TokenClone::new(" ", 4),
+                        reason: ParsingFailure::UnexpectedEndOfExpression,
+                    }
+                )
+            )
+        }
+
+        #[test]
+        fn multiple_failures_parsing_spec_err() {
+            let text = "5eva: [";
+            let mpo = parsing::get_memberspec(text, 0);
+            let member = validating::validate_memberspec(&mpo);
+            pretty_assertions::assert_eq!(
+                member,
+                Err(ElucidatorError::merge(&vec![
+                    ElucidatorError::Parsing{
+                        offender: TokenClone::new("", 6),
+                        reason: ParsingFailure::UnexpectedEndOfExpression,
+                    },
+                    ElucidatorError::Parsing{
+                        offender: TokenClone::new(" ", 5),
+                        reason: ParsingFailure::UnexpectedEndOfExpression,
+                    },
+                    ElucidatorError::IllegalSpecification{
+                        offender: "5eva".to_string(),
+                        reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
+                    },
+                ]))
+            );
+        }
+
+        #[test]
+        fn multiple_failures_spec_err() {
+            let text = "5eva: u32[cat]";
+            let mpo = parsing::get_memberspec(text, 0);
+            let member = validating::validate_memberspec(&mpo);
+            pretty_assertions::assert_eq!(
+                member,
+                Err(ElucidatorError::merge(&vec![
+                    ElucidatorError::IllegalSpecification{
+                        offender: "5eva".to_string(),
+                        reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
+                    },
+                    ElucidatorError::IllegalSpecification{
+                        offender: "cat".to_string(),
+                        reason: SpecificationFailure::IllegalArraySizing,
+                    },
+                ]))
+            );
+        }
     }
 }

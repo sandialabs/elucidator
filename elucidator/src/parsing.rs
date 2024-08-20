@@ -137,7 +137,7 @@ pub fn get_word<'a>(data: &'a str, start_col: usize) -> WordParserOutput<'a> {
     if id_start.is_none() {
         errors.push(
             ElucidatorError::Parsing {
-                offender: data.to_string(),
+                offender: TokenClone::new(data, start_col),
                 reason: ParsingFailure::UnexpectedEndOfExpression,
             }
         );
@@ -174,10 +174,10 @@ pub fn get_typespec<'a>(data: &'a str, start_col: usize) -> TypeSpecParserOutput
     if let Some((_, contents)) = data.split_once("[") {
         is_singleton = false;
         let lbracket_pos = data.chars().position(|c| c == '[').unwrap();
+        let lbracket_byte_pos = data.chars().take(lbracket_pos+1).collect::<String>().len();
         end_of_dtype = data.chars().take(lbracket_pos).collect::<String>().len();
         match contents.chars().position(|c| c == ']') {
             Some(rbracket_pos) => {
-                let lbracket_byte_pos = data.chars().take(lbracket_pos+1).collect::<String>().len();
                 let rbracket_byte_pos = data.chars().take(lbracket_pos + rbracket_pos + 1).collect::<String>().len();
                 let byte_start = lbracket_byte_pos;
                 let byte_end = rbracket_byte_pos;
@@ -192,9 +192,13 @@ pub fn get_typespec<'a>(data: &'a str, start_col: usize) -> TypeSpecParserOutput
             },
             None => {
                 sizing = None;
+                println!("{}", &data[lbracket_byte_pos..].len());
                 errors.push(
                     ElucidatorError::Parsing {
-                        offender: data.to_string(),
+                        offender: TokenClone::new(
+                          &data[lbracket_byte_pos..],
+                          start_col + lbracket_pos,
+                        ),
                         reason: ParsingFailure::UnexpectedEndOfExpression
                     }
                 );
@@ -240,9 +244,15 @@ pub fn get_memberspec<'a>(data: &'a str, start_col: usize) -> MemberSpecParserOu
         }
         typespec = Some(tso);
     } else {
+        let start_non_whitespace = match data.chars().position(|x| !x.is_whitespace()) {
+            Some(n) => start_col + n,
+            None => start_col,
+        };
         errors.push(
             ElucidatorError::Parsing {
-                offender: data.to_string().trim().to_string(), 
+                offender: TokenClone::new(
+                    data.to_string().trim(), start_non_whitespace
+                ),
                 reason: ParsingFailure::MissingIdSpecDelimiter
             }
         );
@@ -293,6 +303,7 @@ pub fn get_metadataspec<'a>(data: &'a str) -> MetadataSpecParserOutput<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::token::TokenClone;
     use rand::random;
     use pretty_assertions::{assert_eq, assert_ne};
 
@@ -439,7 +450,7 @@ mod test {
                     word: None,
                     errors: vec![
                         ElucidatorError::Parsing {
-                            offender: text.to_string(),
+                            offender: TokenClone::new(text, 0),
                             reason: ParsingFailure::UnexpectedEndOfExpression
                         }
                     ],
@@ -746,6 +757,9 @@ mod test {
                     start,
                     end,
             )};
+            let eoe_start = dtype_text.chars().count()
+                + 1
+                + whitespace.chars().count();
             let output = get_typespec(text, 0);
             pretty_assertions::assert_eq!(
                 output,
@@ -753,7 +767,9 @@ mod test {
                     sizing: None,
                     dtype: Some(dtoken),
                     errors: vec![
-                        ElucidatorError::Parsing { offender: body, reason: ParsingFailure::UnexpectedEndOfExpression }
+                        ElucidatorError::Parsing {
+                            offender: TokenClone::new(&sizing_body, 11),
+                            reason: ParsingFailure::UnexpectedEndOfExpression }
                     ],
                     is_singleton: false,
                 }
@@ -945,7 +961,7 @@ mod test {
                     typespec: None,
                     errors: vec![
                         ElucidatorError::Parsing {
-                            offender: "foo u8".to_string(),
+                            offender: TokenClone::new("foo u8", 2),
                             reason: ParsingFailure::MissingIdSpecDelimiter
                         }
                     ]

@@ -1,9 +1,10 @@
 use std::{fmt, string::FromUtf8Error};
+use crate::token::TokenClone;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ElucidatorError {
     /// Errors related to parsing strings, see [`ParsingFailure`] for reasons parsing might fail
-    Parsing{offender: String, reason: ParsingFailure},
+    Parsing{offender: TokenClone, reason: ParsingFailure},
     /// Errors related to converting between incompatible types
     Conversion{from: String, to: String},
     /// Errors related to attempt to cast from high precision or range to low precision or range
@@ -64,7 +65,7 @@ impl fmt::Display for ElucidatorError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let m = match self {
             Self::Parsing{offender, reason} => {
-                format!("Failed to parse expression \"{offender}\": {reason}")
+                format!("Failed to parse due to {reason}: {offender}")
             },
             Self::Conversion{from, to} => {
                 format!("Cannot convert {from} to {to}")
