@@ -201,7 +201,7 @@ mod tests {
             assert_eq!(
                 ident,
                 Err(InternalError::IllegalSpecification {
-                    offender: TokenClone::new(ident_text, 0),
+                    offender: TokenClone::new(ident_text.trim(), 0),
                     reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                 })
             );
@@ -348,7 +348,7 @@ mod tests {
             pretty_assertions::assert_eq!(
                 dtype,
                 Err(InternalError::IllegalSpecification {
-                    offender: text.to_string(),
+                    offender: TokenClone::new(text, 0),
                     reason: SpecificationFailure::IllegalDataType,
                 })
             );
@@ -387,7 +387,7 @@ mod tests {
             pretty_assertions::assert_eq!(
                 dtype,
                 Err(InternalError::IllegalSpecification {
-                    offender: text.to_string(),
+                    offender: TokenClone::new(text, 0),
                     reason: SpecificationFailure::IllegalDataType,
                 })
             );
@@ -450,7 +450,7 @@ mod tests {
             pretty_assertions::assert_eq!(
                 sizing,
                 Err(InternalError::IllegalSpecification {
-                    offender: text.to_string(),
+                    offender: TokenClone::new(text, 0),
                     reason: SpecificationFailure::IllegalArraySizing
             }));
         } 
@@ -463,7 +463,7 @@ mod tests {
             pretty_assertions::assert_eq!(
                 sizing,
                 Err(InternalError::IllegalSpecification { 
-                    offender: text.to_string(),
+                    offender: TokenClone::new(text, 0),
                     reason: SpecificationFailure::IllegalArraySizing,
                 })
             );
@@ -477,7 +477,7 @@ mod tests {
             pretty_assertions::assert_eq!(
                 sizing,
                 Err(InternalError::IllegalSpecification { 
-                    offender: text.to_string(),
+                    offender: TokenClone::new(text, 0),
                     reason: SpecificationFailure::IllegalArraySizing,
                 })
             );
@@ -513,7 +513,7 @@ mod tests {
                 member,
                 Err(
                     InternalError::IllegalSpecification{
-                        offender: ident.to_string(),
+                        offender: TokenClone::new(ident, 0),
                         reason: SpecificationFailure::IllegalArraySizing,
                     },
                 )
@@ -579,7 +579,7 @@ mod tests {
                         reason: ParsingFailure::UnexpectedEndOfExpression,
                     },
                     InternalError::IllegalSpecification{
-                        offender: "5eva".to_string(),
+                        offender: TokenClone::new("5eva", 0),
                         reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                     },
                 ]))
@@ -595,11 +595,11 @@ mod tests {
                 member,
                 Err(InternalError::merge(&vec![
                     InternalError::IllegalSpecification{
-                        offender: "5eva".to_string(),
+                        offender: TokenClone::new("5eva", 0),
                         reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                     },
                     InternalError::IllegalSpecification{
-                        offender: "cat".to_string(),
+                        offender: TokenClone::new("cat", 10),
                         reason: SpecificationFailure::IllegalArraySizing,
                     },
                 ]))
