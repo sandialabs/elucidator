@@ -192,7 +192,6 @@ pub fn get_typespec<'a>(data: &'a str, start_col: usize) -> TypeSpecParserOutput
             },
             None => {
                 sizing = None;
-                println!("{}", &data[lbracket_byte_pos..].len());
                 errors.push(
                     ElucidatorError::Parsing {
                         offender: TokenClone::new(
@@ -757,9 +756,6 @@ mod test {
                     start,
                     end,
             )};
-            let eoe_start = dtype_text.chars().count()
-                + 1
-                + whitespace.chars().count();
             let output = get_typespec(text, 0);
             pretty_assertions::assert_eq!(
                 output,
