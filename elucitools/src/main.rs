@@ -1,3 +1,18 @@
+use clap::Parser;
+use elucidator::designation::DesignationSpecification;
+
+/// Verify that a given designation string is valid
+#[derive(Parser)]
+struct Args {
+    /// String to validate
+    input: String,
+}
+
 fn main() {
-    println!("Hello, world!");
+    let args = Args::parse();
+
+    match DesignationSpecification::from_str(&args.input) {
+        Ok(_) => println!("All good!"),
+        Err(e) => print!("{e}"),
+    }
 }
