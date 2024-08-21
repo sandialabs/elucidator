@@ -80,14 +80,14 @@ impl fmt::Display for ElucidatorError {
                 format!("{source}")
             },
             Self::Specification{context, column_start, column_end, reason} => {
-                format!("Error {reason}: {column_start}-{column_end}; context {context}\n")
+                format!("Error {reason} between positions {column_start} and {column_end}:\n{context}\n")
             },
             Self::MultipleErrors(errs) => {
                 errs
                     .iter()
                     .map(|x| format!("{x}"))
                     .collect::<Vec<String>>()
-                    .join("\n")
+                    .join("")
             },
         };
         write!(f, "{m}")
