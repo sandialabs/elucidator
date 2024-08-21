@@ -123,6 +123,15 @@ pub fn representable_primitive_impl(item: TokenStream) -> TokenStream {
         .collect::<Vec<String>>()
         .join("\n");
     let conversion_functions: proc_macro2::TokenStream = conversion_text.parse().unwrap();
+    let vec_conversion_text = target_types.iter()
+        .map(|x| format!(
+            "fn as_vec_{x}(&self) -> std::result::Result<std::vec::Vec<std::primitive::{x}>, crate::ElucidatorError> {{
+               crate::ElucidatorError::new_conversion(\"{string_repr}\", \"{x} array\")
+            }}\n"
+        ))
+        .collect::<Vec<String>>()
+        .join("\n");
+    let vec_conversion_functions: proc_macro2::TokenStream = vec_conversion_text.parse().unwrap();
 
     let gen = quote! {
         impl Representable for #last_ident {
@@ -137,6 +146,7 @@ pub fn representable_primitive_impl(item: TokenStream) -> TokenStream {
             fn as_string(&self) -> std::result::Result<std::string::String, crate::ElucidatorError> {
                 crate::ElucidatorError::new_conversion(#string_repr, "string")
             }
+            #vec_conversion_functions
         }
     };
     gen.into()

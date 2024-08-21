@@ -146,6 +146,17 @@ pub trait Representable {
     /// Attempt to convert this type into a f64
     fn as_f64(&self) -> Result<f64, ElucidatorError>;
     fn as_string(&self) -> Result<String, ElucidatorError>;
+    fn as_vec_u8(&self) -> Result<Vec<u8>, ElucidatorError>;
+    fn as_vec_u16(&self) -> Result<Vec<u16>, ElucidatorError>;
+    fn as_vec_u32(&self) -> Result<Vec<u32>, ElucidatorError>;
+    fn as_vec_u64(&self) -> Result<Vec<u64>, ElucidatorError>;
+    fn as_vec_i8(&self) -> Result<Vec<i8>, ElucidatorError>;
+    fn as_vec_i16(&self) -> Result<Vec<i16>, ElucidatorError>;
+    fn as_vec_i32(&self) -> Result<Vec<i32>, ElucidatorError>;
+    fn as_vec_i64(&self) -> Result<Vec<i64>, ElucidatorError>;
+    fn as_vec_f32(&self) -> Result<Vec<f32>, ElucidatorError>;
+    fn as_vec_f64(&self) -> Result<Vec<f64>, ElucidatorError>;
+
 }
 
 representable_primitive_impl!(std::primitive::u8);
@@ -211,6 +222,36 @@ impl Representable for String {
         ElucidatorError::new_conversion("string", "f64")
     }
     fn as_string(&self) -> Result<String, ElucidatorError> { Ok(self.clone()) }
+    fn as_vec_u8(&self) -> Result<Vec<u8>, ElucidatorError> {
+        ElucidatorError::new_conversion("string", "u8 array")
+    }
+    fn as_vec_u16(&self) -> Result<Vec<u16>, ElucidatorError> {
+        ElucidatorError::new_conversion("string", "u16 array")
+    }
+    fn as_vec_u32(&self) -> Result<Vec<u32>, ElucidatorError> {
+        ElucidatorError::new_conversion("string", "u32 array")
+    }
+    fn as_vec_u64(&self) -> Result<Vec<u64>, ElucidatorError> {
+        ElucidatorError::new_conversion("string", "u64 array")
+    }
+    fn as_vec_i8(&self) -> Result<Vec<i8>, ElucidatorError> {
+        ElucidatorError::new_conversion("string", "i8 array")
+    }
+    fn as_vec_i16(&self) -> Result<Vec<i16>, ElucidatorError> {
+        ElucidatorError::new_conversion("string", "i16 array")
+    }
+    fn as_vec_i32(&self) -> Result<Vec<i32>, ElucidatorError> {
+        ElucidatorError::new_conversion("string", "i32 array")
+    }
+    fn as_vec_i64(&self) -> Result<Vec<i64>, ElucidatorError> {
+        ElucidatorError::new_conversion("string", "i64 array")
+    }
+    fn as_vec_f32(&self) -> Result<Vec<f32>, ElucidatorError> {
+        ElucidatorError::new_conversion("string", "f32 array")
+    }
+    fn as_vec_f64(&self) -> Result<Vec<f64>, ElucidatorError> {
+        ElucidatorError::new_conversion("string", "f64 array")
+    }
 }
 
 #[cfg(test)]
@@ -348,6 +389,116 @@ mod tests {
     conversion_test!(f64, as_f64,    f64_to_f64, Ok(f64::default()));
     conversion_test!(f64, as_string, f64_as_string, ElucidatorError::new_conversion("f64", "string"));
 
+    conversion_test!(u8, as_vec_u8, u8_as_vec_u8, ElucidatorError::new_conversion("u8", "u8 array"));
+    conversion_test!(u8, as_vec_u16, u8_as_vec_u16, ElucidatorError::new_conversion("u8", "u16 array"));
+    conversion_test!(u8, as_vec_u32, u8_as_vec_u32, ElucidatorError::new_conversion("u8", "u32 array"));
+    conversion_test!(u8, as_vec_u64, u8_as_vec_u64, ElucidatorError::new_conversion("u8", "u64 array"));
+    conversion_test!(u8, as_vec_i8, u8_as_vec_i8, ElucidatorError::new_conversion("u8", "i8 array"));
+    conversion_test!(u8, as_vec_i16, u8_as_vec_i16, ElucidatorError::new_conversion("u8", "i16 array"));
+    conversion_test!(u8, as_vec_i32, u8_as_vec_i32, ElucidatorError::new_conversion("u8", "i32 array"));
+    conversion_test!(u8, as_vec_i64, u8_as_vec_i64, ElucidatorError::new_conversion("u8", "i64 array"));
+    conversion_test!(u8, as_vec_f32, u8_as_vec_f32, ElucidatorError::new_conversion("u8", "f32 array"));
+    conversion_test!(u8, as_vec_f64, u8_as_vec_f64, ElucidatorError::new_conversion("u8", "f64 array"));
+
+    conversion_test!(u16, as_vec_u8, u16_as_vec_u8, ElucidatorError::new_conversion("u16", "u8 array"));
+    conversion_test!(u16, as_vec_u16, u16_as_vec_u16, ElucidatorError::new_conversion("u16", "u16 array"));
+    conversion_test!(u16, as_vec_u32, u16_as_vec_u32, ElucidatorError::new_conversion("u16", "u32 array"));
+    conversion_test!(u16, as_vec_u64, u16_as_vec_u64, ElucidatorError::new_conversion("u16", "u64 array"));
+    conversion_test!(u16, as_vec_i8, u16_as_vec_i8, ElucidatorError::new_conversion("u16", "i8 array"));
+    conversion_test!(u16, as_vec_i16, u16_as_vec_i16, ElucidatorError::new_conversion("u16", "i16 array"));
+    conversion_test!(u16, as_vec_i32, u16_as_vec_i32, ElucidatorError::new_conversion("u16", "i32 array"));
+    conversion_test!(u16, as_vec_i64, u16_as_vec_i64, ElucidatorError::new_conversion("u16", "i64 array"));
+    conversion_test!(u16, as_vec_f32, u16_as_vec_f32, ElucidatorError::new_conversion("u16", "f32 array"));
+    conversion_test!(u16, as_vec_f64, u16_as_vec_f64, ElucidatorError::new_conversion("u16", "f64 array"));
+
+    conversion_test!(u32, as_vec_u8, u32_as_vec_u8, ElucidatorError::new_conversion("u32", "u8 array"));
+    conversion_test!(u32, as_vec_u16, u32_as_vec_u16, ElucidatorError::new_conversion("u32", "u16 array"));
+    conversion_test!(u32, as_vec_u32, u32_as_vec_u32, ElucidatorError::new_conversion("u32", "u32 array"));
+    conversion_test!(u32, as_vec_u64, u32_as_vec_u64, ElucidatorError::new_conversion("u32", "u64 array"));
+    conversion_test!(u32, as_vec_i8, u32_as_vec_i8, ElucidatorError::new_conversion("u32", "i8 array"));
+    conversion_test!(u32, as_vec_i16, u32_as_vec_i16, ElucidatorError::new_conversion("u32", "i16 array"));
+    conversion_test!(u32, as_vec_i32, u32_as_vec_i32, ElucidatorError::new_conversion("u32", "i32 array"));
+    conversion_test!(u32, as_vec_i64, u32_as_vec_i64, ElucidatorError::new_conversion("u32", "i64 array"));
+    conversion_test!(u32, as_vec_f32, u32_as_vec_f32, ElucidatorError::new_conversion("u32", "f32 array"));
+    conversion_test!(u32, as_vec_f64, u32_as_vec_f64, ElucidatorError::new_conversion("u32", "f64 array"));
+
+    conversion_test!(u64, as_vec_u8, u64_as_vec_u8, ElucidatorError::new_conversion("u64", "u8 array"));
+    conversion_test!(u64, as_vec_u16, u64_as_vec_u16, ElucidatorError::new_conversion("u64", "u16 array"));
+    conversion_test!(u64, as_vec_u32, u64_as_vec_u32, ElucidatorError::new_conversion("u64", "u32 array"));
+    conversion_test!(u64, as_vec_u64, u64_as_vec_u64, ElucidatorError::new_conversion("u64", "u64 array"));
+    conversion_test!(u64, as_vec_i8, u64_as_vec_i8, ElucidatorError::new_conversion("u64", "i8 array"));
+    conversion_test!(u64, as_vec_i16, u64_as_vec_i16, ElucidatorError::new_conversion("u64", "i16 array"));
+    conversion_test!(u64, as_vec_i32, u64_as_vec_i32, ElucidatorError::new_conversion("u64", "i32 array"));
+    conversion_test!(u64, as_vec_i64, u64_as_vec_i64, ElucidatorError::new_conversion("u64", "i64 array"));
+    conversion_test!(u64, as_vec_f32, u64_as_vec_f32, ElucidatorError::new_conversion("u64", "f32 array"));
+    conversion_test!(u64, as_vec_f64, u64_as_vec_f64, ElucidatorError::new_conversion("u64", "f64 array"));
+
+    conversion_test!(i8, as_vec_u8, i8_as_vec_u8, ElucidatorError::new_conversion("i8", "u8 array"));
+    conversion_test!(i8, as_vec_u16, i8_as_vec_u16, ElucidatorError::new_conversion("i8", "u16 array"));
+    conversion_test!(i8, as_vec_u32, i8_as_vec_u32, ElucidatorError::new_conversion("i8", "u32 array"));
+    conversion_test!(i8, as_vec_u64, i8_as_vec_u64, ElucidatorError::new_conversion("i8", "u64 array"));
+    conversion_test!(i8, as_vec_i8, i8_as_vec_i8, ElucidatorError::new_conversion("i8", "i8 array"));
+    conversion_test!(i8, as_vec_i16, i8_as_vec_i16, ElucidatorError::new_conversion("i8", "i16 array"));
+    conversion_test!(i8, as_vec_i32, i8_as_vec_i32, ElucidatorError::new_conversion("i8", "i32 array"));
+    conversion_test!(i8, as_vec_i64, i8_as_vec_i64, ElucidatorError::new_conversion("i8", "i64 array"));
+    conversion_test!(i8, as_vec_f32, i8_as_vec_f32, ElucidatorError::new_conversion("i8", "f32 array"));
+    conversion_test!(i8, as_vec_f64, i8_as_vec_f64, ElucidatorError::new_conversion("i8", "f64 array"));
+
+    conversion_test!(i16, as_vec_u8, i16_as_vec_u8, ElucidatorError::new_conversion("i16", "u8 array"));
+    conversion_test!(i16, as_vec_u16, i16_as_vec_u16, ElucidatorError::new_conversion("i16", "u16 array"));
+    conversion_test!(i16, as_vec_u32, i16_as_vec_u32, ElucidatorError::new_conversion("i16", "u32 array"));
+    conversion_test!(i16, as_vec_u64, i16_as_vec_u64, ElucidatorError::new_conversion("i16", "u64 array"));
+    conversion_test!(i16, as_vec_i8, i16_as_vec_i8, ElucidatorError::new_conversion("i16", "i8 array"));
+    conversion_test!(i16, as_vec_i16, i16_as_vec_i16, ElucidatorError::new_conversion("i16", "i16 array"));
+    conversion_test!(i16, as_vec_i32, i16_as_vec_i32, ElucidatorError::new_conversion("i16", "i32 array"));
+    conversion_test!(i16, as_vec_i64, i16_as_vec_i64, ElucidatorError::new_conversion("i16", "i64 array"));
+    conversion_test!(i16, as_vec_f32, i16_as_vec_f32, ElucidatorError::new_conversion("i16", "f32 array"));
+    conversion_test!(i16, as_vec_f64, i16_as_vec_f64, ElucidatorError::new_conversion("i16", "f64 array"));
+
+    conversion_test!(i32, as_vec_u8, i32_as_vec_u8, ElucidatorError::new_conversion("i32", "u8 array"));
+    conversion_test!(i32, as_vec_u16, i32_as_vec_u16, ElucidatorError::new_conversion("i32", "u16 array"));
+    conversion_test!(i32, as_vec_u32, i32_as_vec_u32, ElucidatorError::new_conversion("i32", "u32 array"));
+    conversion_test!(i32, as_vec_u64, i32_as_vec_u64, ElucidatorError::new_conversion("i32", "u64 array"));
+    conversion_test!(i32, as_vec_i8, i32_as_vec_i8, ElucidatorError::new_conversion("i32", "i8 array"));
+    conversion_test!(i32, as_vec_i16, i32_as_vec_i16, ElucidatorError::new_conversion("i32", "i16 array"));
+    conversion_test!(i32, as_vec_i32, i32_as_vec_i32, ElucidatorError::new_conversion("i32", "i32 array"));
+    conversion_test!(i32, as_vec_i64, i32_as_vec_i64, ElucidatorError::new_conversion("i32", "i64 array"));
+    conversion_test!(i32, as_vec_f32, i32_as_vec_f32, ElucidatorError::new_conversion("i32", "f32 array"));
+    conversion_test!(i32, as_vec_f64, i32_as_vec_f64, ElucidatorError::new_conversion("i32", "f64 array"));
+
+    conversion_test!(i64, as_vec_u8, i64_as_vec_u8, ElucidatorError::new_conversion("i64", "u8 array"));
+    conversion_test!(i64, as_vec_u16, i64_as_vec_u16, ElucidatorError::new_conversion("i64", "u16 array"));
+    conversion_test!(i64, as_vec_u32, i64_as_vec_u32, ElucidatorError::new_conversion("i64", "u32 array"));
+    conversion_test!(i64, as_vec_u64, i64_as_vec_u64, ElucidatorError::new_conversion("i64", "u64 array"));
+    conversion_test!(i64, as_vec_i8, i64_as_vec_i8, ElucidatorError::new_conversion("i64", "i8 array"));
+    conversion_test!(i64, as_vec_i16, i64_as_vec_i16, ElucidatorError::new_conversion("i64", "i16 array"));
+    conversion_test!(i64, as_vec_i32, i64_as_vec_i32, ElucidatorError::new_conversion("i64", "i32 array"));
+    conversion_test!(i64, as_vec_i64, i64_as_vec_i64, ElucidatorError::new_conversion("i64", "i64 array"));
+    conversion_test!(i64, as_vec_f32, i64_as_vec_f32, ElucidatorError::new_conversion("i64", "f32 array"));
+    conversion_test!(i64, as_vec_f64, i64_as_vec_f64, ElucidatorError::new_conversion("i64", "f64 array"));
+
+    conversion_test!(f32, as_vec_u8, f32_as_vec_u8, ElucidatorError::new_conversion("f32", "u8 array"));
+    conversion_test!(f32, as_vec_u16, f32_as_vec_u16, ElucidatorError::new_conversion("f32", "u16 array"));
+    conversion_test!(f32, as_vec_u32, f32_as_vec_u32, ElucidatorError::new_conversion("f32", "u32 array"));
+    conversion_test!(f32, as_vec_u64, f32_as_vec_u64, ElucidatorError::new_conversion("f32", "u64 array"));
+    conversion_test!(f32, as_vec_i8, f32_as_vec_i8, ElucidatorError::new_conversion("f32", "i8 array"));
+    conversion_test!(f32, as_vec_i16, f32_as_vec_i16, ElucidatorError::new_conversion("f32", "i16 array"));
+    conversion_test!(f32, as_vec_i32, f32_as_vec_i32, ElucidatorError::new_conversion("f32", "i32 array"));
+    conversion_test!(f32, as_vec_i64, f32_as_vec_i64, ElucidatorError::new_conversion("f32", "i64 array"));
+    conversion_test!(f32, as_vec_f32, f32_as_vec_f32, ElucidatorError::new_conversion("f32", "f32 array"));
+    conversion_test!(f32, as_vec_f64, f32_as_vec_f64, ElucidatorError::new_conversion("f32", "f64 array"));
+
+    conversion_test!(f64, as_vec_u8, f64_as_vec_u8, ElucidatorError::new_conversion("f64", "u8 array"));
+    conversion_test!(f64, as_vec_u16, f64_as_vec_u16, ElucidatorError::new_conversion("f64", "u16 array"));
+    conversion_test!(f64, as_vec_u32, f64_as_vec_u32, ElucidatorError::new_conversion("f64", "u32 array"));
+    conversion_test!(f64, as_vec_u64, f64_as_vec_u64, ElucidatorError::new_conversion("f64", "u64 array"));
+    conversion_test!(f64, as_vec_i8, f64_as_vec_i8, ElucidatorError::new_conversion("f64", "i8 array"));
+    conversion_test!(f64, as_vec_i16, f64_as_vec_i16, ElucidatorError::new_conversion("f64", "i16 array"));
+    conversion_test!(f64, as_vec_i32, f64_as_vec_i32, ElucidatorError::new_conversion("f64", "i32 array"));
+    conversion_test!(f64, as_vec_i64, f64_as_vec_i64, ElucidatorError::new_conversion("f64", "i64 array"));
+    conversion_test!(f64, as_vec_f32, f64_as_vec_f32, ElucidatorError::new_conversion("f64", "f32 array"));
+    conversion_test!(f64, as_vec_f64, f64_as_vec_f64, ElucidatorError::new_conversion("f64", "f64 array"));
+
     conversion_test!(String, as_u8, string_to_u8, ElucidatorError::new_conversion("string", "u8"));
     conversion_test!(String, as_u16, string_to_u16, ElucidatorError::new_conversion("string", "u16"));
     conversion_test!(String, as_u32, string_to_u32, ElucidatorError::new_conversion("string", "u32"));
@@ -359,4 +510,16 @@ mod tests {
     conversion_test!(String, as_f32, string_to_f32, ElucidatorError::new_conversion("string", "f32"));
     conversion_test!(String, as_f64, string_to_f64, ElucidatorError::new_conversion("string", "f64"));
     conversion_test!(String, as_string, string_to_string, Ok(String::default()));
+    conversion_test!(String, as_vec_u8, string_to_vec_u8, ElucidatorError::new_conversion("string", "u8 array"));
+
+        conversion_test!(String, as_vec_u8, string_as_vec_u8, ElucidatorError::new_conversion("string", "u8 array"));
+    conversion_test!(String, as_vec_u16, string_as_vec_u16, ElucidatorError::new_conversion("string", "u16 array"));
+    conversion_test!(String, as_vec_u32, string_as_vec_u32, ElucidatorError::new_conversion("string", "u32 array"));
+    conversion_test!(String, as_vec_u64, string_as_vec_u64, ElucidatorError::new_conversion("string", "u64 array"));
+    conversion_test!(String, as_vec_i8, string_as_vec_i8, ElucidatorError::new_conversion("string", "i8 array"));
+    conversion_test!(String, as_vec_i16, string_as_vec_i16, ElucidatorError::new_conversion("string", "i16 array"));
+    conversion_test!(String, as_vec_i32, string_as_vec_i32, ElucidatorError::new_conversion("string", "i32 array"));
+    conversion_test!(String, as_vec_i64, string_as_vec_i64, ElucidatorError::new_conversion("string", "i64 array"));
+    conversion_test!(String, as_vec_f32, string_as_vec_f32, ElucidatorError::new_conversion("string", "f32 array"));
+    conversion_test!(String, as_vec_f64, string_as_vec_f64, ElucidatorError::new_conversion("string", "f64 array"));
 }
