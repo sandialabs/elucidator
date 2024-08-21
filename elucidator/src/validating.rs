@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::member::{Dtype, Sizing, MemberSpecification};
-use crate::token::{TokenClone, TokenData, DtypeToken, IdentifierToken, SizingToken};
-use crate::{error::*, Representable};
+use crate::token::{TokenClone, DtypeToken, IdentifierToken, SizingToken};
+use crate::error::*;
 use crate::parsing::*;
 
 type Result<T, E = InternalError> = std::result::Result<T, E>;
@@ -66,7 +66,7 @@ pub(crate) fn validate_dtype(dtoken: &DtypeToken) -> Result<Dtype> {
         "f32" => Dtype::Float32,
         "f64" => Dtype::Float64,
         "string" => Dtype::Str,
-        ss => {
+        _ => {
             Err(
                 InternalError::IllegalSpecification{
                     offender: TokenClone::from_token_data(&dtoken.data),
@@ -255,7 +255,7 @@ pub(crate) fn validate_metadataspec(mpo: &MetadataSpecParserOutput) -> Result<Ve
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{parsing, validating, token::TokenClone};
+    use crate::{parsing, validating, token::TokenClone, test_utils};
     use pretty_assertions;
 
     mod identifier {
@@ -275,6 +275,34 @@ mod tests {
             let ipo = parsing::get_identifier(ident_text, 0);
             let ident = validating::validate_identifier(&ipo.identifier.unwrap());
             assert_eq!(ident, Ok("foo10".to_string()));
+        }
+
+        #[test]
+        fn crab_emoji_err() {
+            let ident_text = test_utils::crab_emoji();
+            let ipo = parsing::get_identifier(ident_text.as_str(), 0);
+            let ident = validating::validate_identifier(&ipo.identifier.unwrap());
+            pretty_assertions::assert_eq!(
+                ident,
+                Err(InternalError::merge(&vec![
+                    InternalError::IllegalSpecification {
+                        offender: TokenClone::new(ident_text.trim(), 0),
+                        reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
+                    },
+                    InternalError::IllegalSpecification {
+                        offender: TokenClone::new(ident_text.trim(), 0),
+                        reason: SpecificationFailure::IllegalCharacters(
+                            vec![
+                                test_utils::crab_emoji()
+                                    .chars()
+                                    .nth(0)
+                                    .unwrap()
+                            ]
+                        ),
+                    },
+                ]))
+            );
+
         }
 
         #[test]

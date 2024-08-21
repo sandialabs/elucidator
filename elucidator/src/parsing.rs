@@ -1,7 +1,5 @@
 use crate::{error::*, token::*};
 
-type Result<T, E = InternalError> = std::result::Result<T, E>;
-
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct WordParserOutput<'a> {
     word: Option<TokenData<'a>>,
@@ -304,7 +302,6 @@ mod test {
     use super::*;
     use crate::token::TokenClone;
     use rand::random;
-    use pretty_assertions::{assert_eq, assert_ne};
 
     fn lowercase_ascii_chars() -> Vec<char> {
         (u8::MIN..u8::MAX)
@@ -778,6 +775,7 @@ mod test {
         use super::*;
     
         /// For making sure text with no whitespace works
+        #[allow(unused_assignments)]
         fn run_ok_simple(ident: &str, dtype: &str, sizing: Option<&str>) {
             let text = if let Some(size) = sizing {
                 format!("{ident}:{dtype}[{size}]")
@@ -819,6 +817,7 @@ mod test {
         }
 
         /// Run a single test case of whitespace insertion
+        #[allow(unused_assignments)]
         fn run_ok_whitespace(ident: &str, dtype: &str, sizing: Option<&str>) {
             let lident = fill();
             let rident = fill();

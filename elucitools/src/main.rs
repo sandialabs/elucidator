@@ -12,7 +12,7 @@ fn main() {
     let args = Args::parse();
 
     match DesignationSpecification::from_str(&args.input) {
-        Ok(o) => println!("All good!"),
+        Ok(_) => println!("All good!"),
         Err(e) => print!("{e}"),
     }
 }

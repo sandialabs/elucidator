@@ -121,7 +121,6 @@ impl Dtype {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
 
     #[test]
     fn get_u8_from_buffer() {

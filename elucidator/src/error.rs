@@ -118,9 +118,6 @@ impl InternalError {
             }
         }
     }
-    pub fn merge_with(left: &InternalError, right: &InternalError) -> InternalError {
-        Self::merge(&vec![left.clone(), right.clone()])
-    }
     pub fn merge(errs: &Vec<InternalError>) -> InternalError {
         let errors: Vec<InternalError> = errs.iter()
             .map(InternalError::expand)
