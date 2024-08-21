@@ -62,7 +62,6 @@ impl ElucidatorError {
             ElucidatorError::MultipleErrors(Box::new(errors))
         }
     }
-
 }
 
 impl fmt::Display for ElucidatorError {
@@ -81,11 +80,7 @@ impl fmt::Display for ElucidatorError {
                 format!("{source}")
             },
             Self::Specification{context, column_start, column_end, reason} => {
-                let marking_line = (0..*column_end)
-                    .map(|x| if x < *column_start { ' ' } else { '^' })
-                    .collect::<String>();
-                let error_text = format!("ERROR: {reason}");
-                format!("{error_text}\n\t{context}\n\t{marking_line}\n")
+                format!("Error {reason}: {column_start}-{column_end}; context {context}\n")
             },
             Self::MultipleErrors(errs) => {
                 errs
