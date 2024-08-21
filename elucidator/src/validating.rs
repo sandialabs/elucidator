@@ -168,12 +168,7 @@ pub(crate) fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<Member
     }
 }
 
-fn repeated_identifiers<'a>(members: &'a Vec<MemberSpecification>) -> Vec<&'a str> {
-    let member_names: Vec<&str> = members
-        .iter()
-        .map(|x| x.identifier.as_str())
-        .collect();
-
+fn repeated_identifiers<'a>(member_names: &'a Vec<&'a str>) -> Vec<&'a str> {
     let mut identifier_counts: HashMap<&str, usize> = HashMap::new();
     for identifier in member_names {
         identifier_counts
@@ -236,8 +231,14 @@ fn err_from_repeat(mpo: &MetadataSpecParserOutput, repeat: &str) -> InternalErro
 
 pub(crate) fn validate_metadataspec(mpo: &MetadataSpecParserOutput) -> Result<Vec<MemberSpecification>, InternalError> {
     let mut errors: Vec<InternalError> = mpo.errors.clone();
+
+    let members: Vec<&str> = mpo.member_outputs
+        .iter()
+        .filter(|x| x.identifier.is_some())
+        .map(|x| x.identifier.as_ref().unwrap().data.data)
+        .collect();
     
-    let (members, errs) = perform_metadata_partition(mpo);
+    let (ok_members, errs) = perform_metadata_partition(mpo);
     errs.iter().for_each(|e| {
         errors.push(e.as_ref().unwrap_err().clone())
     });
@@ -246,7 +247,7 @@ pub(crate) fn validate_metadataspec(mpo: &MetadataSpecParserOutput) -> Result<Ve
     });
 
     if errors.is_empty() {
-        Ok(members)
+        Ok(ok_members)
     } else {
         Err(InternalError::merge(&errors))
     }
@@ -810,5 +811,36 @@ mod tests {
                 })
             );
         }
+
+        #[test]
+        fn metadata_repeated_identifier_one_wrong_err() {
+            let text = "foo: bar, foo: u32";
+            let mpo = parsing::get_metadataspec(text);
+            let spec = validating::validate_metadataspec(&mpo);
+            pretty_assertions::assert_eq!(
+                spec,
+                Err(InternalError::merge(&vec![
+                    InternalError::IllegalSpecification {
+                        offender: TokenClone::new("bar", 5),
+                        reason: SpecificationFailure::IllegalDataType,
+                    },
+                    InternalError::IllegalSpecification {
+                        offender: TokenClone {
+                            data: "foo".to_string(),
+                            column_start: 10,
+                            column_end: 13,
+                        },
+                        reason: SpecificationFailure::RepeatedIdentifier{
+                            first: TokenClone {
+                                data: "foo".to_string(),
+                                column_start: 0,
+                                column_end: 3,
+                            },
+                        }
+                    },
+                ]))
+            );
+        }
+
     }
 }

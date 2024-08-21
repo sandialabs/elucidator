@@ -187,7 +187,12 @@ impl fmt::Display for SpecificationFailure {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let m = match self {
             Self::RepeatedIdentifier{first} => {
-                format!("Identifier is repeated after occurence at {first:?}, causing a naming collision")
+                format!(
+                    "Identifier \"{}\" is repeated after first occurrence at positions {} to {}, causing a naming collision",
+                    first.data,
+                    first.column_start,
+                    first.column_end
+                )
             },
             Self::IdentifierStartsNonAlphabetical => {
                 format!("Identifiers must start with alphabetical character")

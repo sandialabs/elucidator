@@ -50,7 +50,6 @@ fn subselect_text(text: &str, start: usize, end: usize) -> (&str, usize) {
     };
     let subselection = &text[selection_start..selection_end];
     let offset = text[..selection_start].chars().count();
-    println!("Slice from bytes {selection_start} to {selection_end}");
     (subselection, offset)
 }
 
