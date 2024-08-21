@@ -1,9 +1,9 @@
-use std::error;
+use std::collections::HashMap;
 
 use crate::member::{Dtype, Sizing, MemberSpecification};
-use crate::token::{TokenClone, DtypeToken, IdentifierToken, SizingToken};
+use crate::token::{TokenClone, TokenData, DtypeToken, IdentifierToken, SizingToken};
 use crate::{error::*, Representable};
-use crate::parsing::{DtypeParserOutput, IdentifierParserOutput, MemberSpecParserOutput, SizingParserOutput, TypeSpecParserOutput};
+use crate::parsing::*;
 
 type Result<T, E = InternalError> = std::result::Result<T, E>;
 
@@ -163,6 +163,90 @@ pub(crate) fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<Member
                 &dtype.unwrap())
             )
         }
+    } else {
+        Err(InternalError::merge(&errors))
+    }
+}
+
+fn repeated_identifiers<'a>(members: &'a Vec<MemberSpecification>) -> Vec<&'a str> {
+    let member_names: Vec<&str> = members
+        .iter()
+        .map(|x| x.identifier.as_str())
+        .collect();
+
+    let mut identifier_counts: HashMap<&str, usize> = HashMap::new();
+    for identifier in member_names {
+        identifier_counts
+            .entry(identifier)
+            .and_modify(|id| *id += 1)
+            .or_insert(1);
+    }
+
+    identifier_counts
+        .iter()
+        .filter(|(_, v)| **v > 1)
+        .map(|(k, _)| *k)
+        .collect()
+}
+
+fn perform_metadata_partition(mpo: &MetadataSpecParserOutput) ->
+    (Vec<MemberSpecification>, Vec<Result<MemberSpecification>>)
+{
+    let results = mpo.member_outputs.iter()
+        .map(|x| validate_memberspec(x))
+        .collect::<Vec<Result<MemberSpecification>>>();
+
+    type BigResult = Result<MemberSpecification, InternalError>;
+    type LongPartition = (Vec<BigResult>, Vec<BigResult>);
+
+    let (members, errs): LongPartition = results
+      .into_iter()
+      .partition(Result::is_ok);
+
+    let members: Vec<MemberSpecification> = members
+        .into_iter()
+        .map(Result::unwrap)
+        .collect();
+
+    (members, errs)
+}
+
+fn err_from_repeat(mpo: &MetadataSpecParserOutput, repeat: &str) -> InternalError {
+    // Find matching token
+    let hits: Vec<TokenClone> = mpo.member_outputs
+        .iter()
+        .filter_map(|x| {
+            if x.identifier.as_ref().unwrap().data.data == repeat {
+                Some(TokenClone::from_token_data(
+                    &x.identifier.as_ref().unwrap().data
+                ))
+            } else {
+                None
+            }
+        })
+        .take(2)
+        .collect();
+    InternalError::IllegalSpecification{
+        offender: hits[1].clone(),
+        reason: SpecificationFailure::RepeatedIdentifier{
+            first: hits[0].clone(),
+        }
+    }
+}
+
+pub(crate) fn validate_metadataspec(mpo: &MetadataSpecParserOutput) -> Result<Vec<MemberSpecification>, InternalError> {
+    let mut errors: Vec<InternalError> = mpo.errors.clone();
+    
+    let (members, errs) = perform_metadata_partition(mpo);
+    errs.iter().for_each(|e| {
+        errors.push(e.as_ref().unwrap_err().clone())
+    });
+    repeated_identifiers(&members).iter().for_each(|e| {
+        errors.push(err_from_repeat(mpo, e))
+    });
+
+    if errors.is_empty() {
+        Ok(members)
     } else {
         Err(InternalError::merge(&errors))
     }
@@ -483,6 +567,7 @@ mod tests {
             );
         }         
     }
+
     mod memberspec {
         use super::*;
 
@@ -603,6 +688,98 @@ mod tests {
                         reason: SpecificationFailure::IllegalArraySizing,
                     },
                 ]))
+            );
+        }
+    }
+
+    mod metadata_spec {
+        use super::*;
+
+        #[test]
+        fn metadata_single_ok() {
+            let text = "foo: u32";
+            let mpo = parsing::get_metadataspec(text);
+            let spec = validating::validate_metadataspec(&mpo);
+            pretty_assertions::assert_eq!(
+                spec,
+                Ok(vec![
+                    MemberSpecification::from_parts(
+                        "foo", &Sizing::Singleton, &Dtype::UnsignedInteger32
+                    ),
+                ])
+            );
+        }
+
+        #[test]
+        fn metadata_multiple_ok() {
+            let text = "foo: u32, bar: u8[], baz: string";
+            let mpo = parsing::get_metadataspec(text);
+            let spec = validating::validate_metadataspec(&mpo);
+            pretty_assertions::assert_eq!(
+                spec,
+                Ok(vec![
+                    MemberSpecification::from_parts(
+                        "foo", &Sizing::Singleton, &Dtype::UnsignedInteger32
+                    ),
+                    MemberSpecification::from_parts(
+                        "bar", &Sizing::Dynamic, &Dtype::Byte
+                    ),
+                    MemberSpecification::from_parts(
+                        "baz", &Sizing::Singleton, &Dtype::Str
+                    ),
+                ])
+            );
+        }
+
+        #[test]
+        fn metadata_mixed_ok_err() {
+            let text = "5ever: u32, bar: u8[], baz: string[5]";
+            let mpo = parsing::get_metadataspec(text);
+            let spec = validating::validate_metadataspec(&mpo);
+            pretty_assertions::assert_eq!(
+                spec,
+                Err(InternalError::MultipleFailures(Box::new(vec![
+                    InternalError::IllegalSpecification {
+                        offender: TokenClone {
+                            data: "5ever".to_string(),
+                            column_start: 0,
+                            column_end: 5,
+                        },
+                        reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
+                    },
+                    InternalError::IllegalSpecification {
+                        offender: TokenClone {
+                            data: "baz".to_string(),
+                            column_start: 23,
+                            column_end: 26,
+                        },
+                        reason: SpecificationFailure::IllegalArraySizing,
+                    },
+                ]))),
+            );
+        }
+
+        #[test]
+        fn metadata_repeated_identifier_err() {
+            let text = "foo: u32, foo: u8[]";
+            let mpo = parsing::get_metadataspec(text);
+            let spec = validating::validate_metadataspec(&mpo);
+            pretty_assertions::assert_eq!(
+                spec,
+                Err(InternalError::IllegalSpecification {
+                    offender: TokenClone {
+                        data: "foo".to_string(),
+                        column_start: 10,
+                        column_end: 13,
+                    },
+                    reason: SpecificationFailure::RepeatedIdentifier{
+                        first: TokenClone {
+                            data: "foo".to_string(),
+                            column_start: 0,
+                            column_end: 3,
+                        },
+                    }
+                })
             );
         }
     }

@@ -40,8 +40,8 @@ pub(crate) struct MemberSpecParserOutput<'a> {
 }
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct MetadataSpecParserOutput<'a> {
-    member_outputs: Vec<MemberSpecParserOutput<'a>>,
-    errors: Vec<InternalError>,
+    pub member_outputs: Vec<MemberSpecParserOutput<'a>>,
+    pub errors: Vec<InternalError>,
 }
 
 impl<'a> MemberSpecParserOutput<'a> {

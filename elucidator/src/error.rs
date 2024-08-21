@@ -183,7 +183,7 @@ impl fmt::Display for ParsingFailure {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum SpecificationFailure {
-    RepeatedIdentifier,
+    RepeatedIdentifier{first: TokenClone},
     IdentifierStartsNonAlphabetical,
     IllegalDataType,
     ZeroLengthIdentifier,
@@ -194,8 +194,8 @@ pub(crate) enum SpecificationFailure {
 impl fmt::Display for SpecificationFailure {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let m = match self {
-            Self::RepeatedIdentifier => {
-                format!("Identifier is repeated, causing a naming collision")
+            Self::RepeatedIdentifier{first} => {
+                format!("Identifier is repeated after occurence at {first:?}, causing a naming collision")
             },
             Self::IdentifierStartsNonAlphabetical => {
                 format!("Identifiers must start with alphabetical character")

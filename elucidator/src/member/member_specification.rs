@@ -2,7 +2,7 @@ use crate::member::{sizing::Sizing, dtype::Dtype};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MemberSpecification {
-    identifier: String,
+    pub(crate) identifier: String,
     sizing: Sizing,
     dtype: Dtype,
 }
