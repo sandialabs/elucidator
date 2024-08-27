@@ -222,8 +222,8 @@ mod test {
     }
 
     fn compare_hashmap(left: &DataMap, right: &DataMap) {
-        let left_keys: HashSet<&str> = left.keys().map(|x| *x).collect();
-        let right_keys: HashSet<&str> = right.keys().map(|x| *x).collect();
+        let left_keys: HashSet<&str> = left.keys().copied().collect();
+        let right_keys: HashSet<&str> = right.keys().copied().collect();
 
         pretty_assertions::assert_eq!(left_keys, right_keys);
 
@@ -291,8 +291,8 @@ mod test {
         let text  = "foo: u32, bar: i32";
         let dspec = DesignationSpecification::from_text(text).unwrap(); 
         let expected: DataMap = HashMap::from([
-            ("foo", make_dyn_box(10 as u32)),
-            ("bar", make_dyn_box(-10 as i32)),
+            ("foo", make_dyn_box(10_u32)),
+            ("bar", make_dyn_box(-10_i32)),
         ]);
         let buffer = expected.get("foo").unwrap().as_u32().unwrap().to_le_bytes().iter()
             .chain(expected.get("bar").unwrap().as_i32().unwrap().to_le_bytes().iter())
@@ -307,7 +307,7 @@ mod test {
         let text  = "foo: u32[3], bar: string";
         let dspec = DesignationSpecification::from_text(text).unwrap(); 
         let expected: DataMap = HashMap::from([
-            ("foo", make_dyn_box(vec![2 as u32, 10 as u32, 0xDEADBEEF as u32])),
+            ("foo", make_dyn_box(vec![2_u32, 10_u32, 0xDEADBEEF_u32])),
             ("bar", make_dyn_box(test_utils::crab_emoji())),
         ]);
         let buffer = expected.get("foo").unwrap().as_vec_u32().unwrap().as_buffer().iter()
@@ -323,10 +323,10 @@ mod test {
         let text  = "foo: u32[], bar: string";
         let dspec = DesignationSpecification::from_text(text).unwrap(); 
         let expected: DataMap = HashMap::from([
-            ("foo", make_dyn_box(vec![2 as u32, 10 as u32, 0xDEADBEEF as u32])),
+            ("foo", make_dyn_box(vec![2_u32, 10_u32, 0xDEADBEEF_u32])),
             ("bar", make_dyn_box(test_utils::crab_emoji())),
         ]);
-        let buffer = vec![0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00].iter()
+        let buffer = [0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00].iter()
             .chain(expected.get("foo").unwrap().as_vec_u32().unwrap().as_buffer().iter())
             .chain(expected.get("bar").unwrap().as_string().unwrap().as_buffer().iter())
             .copied()
@@ -340,7 +340,7 @@ mod test {
         let text  = "foo: u8";
         let dspec = DesignationSpecification::from_text(text).unwrap(); 
         let val: u8 = 10;
-        let result = dspec.interpret(&val.to_le_bytes().to_vec());
+        let result = dspec.interpret(val.to_le_bytes().as_ref());
         let result_val = result.unwrap().get("foo").unwrap().as_u8().unwrap();
         assert_eq!(val, result_val);
     } 

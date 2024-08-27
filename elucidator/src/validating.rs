@@ -14,7 +14,7 @@ fn valid_identifier_char(c: char) -> bool {
 pub(crate) fn validate_identifier(itoken: &IdentifierToken) -> Result<String> {
     let mut errors: Vec<InternalError> = Vec::new();
     let identifier = itoken.data.data;
-    match &identifier.chars().nth(0) {
+    match &identifier.chars().next() {
         None => {
             errors.push(InternalError::IllegalSpecification { 
                 offender: TokenClone::from_token_data(&itoken.data),
@@ -37,7 +37,7 @@ pub(crate) fn validate_identifier(itoken: &IdentifierToken) -> Result<String> {
         .collect();
     illegal_chars.sort();
     illegal_chars.dedup();
-    if illegal_chars.len() > 0 {
+    if !illegal_chars.is_empty() {
         errors.push(
             InternalError::IllegalSpecification { 
                 offender: TokenClone::from_token_data(&itoken.data),
@@ -127,7 +127,7 @@ pub(crate) fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<Member
         let typespec = mpo.typespec.clone().unwrap();
         match &typespec.sizing {
             Some(stoken) => { 
-                match validate_sizing(&stoken) {
+                match validate_sizing(stoken) {
                     Ok(o) => { Some(o) },
                     Err(e) => { 
                         errors.push(e);
@@ -257,7 +257,7 @@ pub(crate) fn validate_metadataspec(mpo: &MetadataSpecParserOutput) -> Result<Ve
 mod tests {
     use super::*;
     use crate::{parsing, validating, token::TokenClone, test_utils};
-    use pretty_assertions;
+    
 
     mod identifier {
         use super::*;
@@ -295,8 +295,7 @@ mod tests {
                         reason: SpecificationFailure::IllegalCharacters(
                             vec![
                                 test_utils::crab_emoji()
-                                    .chars()
-                                    .nth(0)
+                                    .chars().next()
                                     .unwrap()
                             ]
                         ),
@@ -767,7 +766,7 @@ mod tests {
             let spec = validating::validate_metadataspec(&mpo);
             pretty_assertions::assert_eq!(
                 spec,
-                Err(InternalError::MultipleFailures(Box::new(vec![
+                Err(InternalError::merge(&vec![
                     InternalError::IllegalSpecification {
                         offender: TokenClone {
                             data: "5ever".to_string(),
@@ -784,7 +783,7 @@ mod tests {
                         },
                         reason: SpecificationFailure::IllegalArraySizing,
                     },
-                ]))),
+                ])),
             );
         }
 
