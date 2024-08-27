@@ -96,6 +96,7 @@ pub(crate) fn validate_sizing(stoken: &SizingToken) -> Result<Sizing> {
     }
 }
 
+#[allow(clippy::unnecessary_unwrap)]
 pub(crate) fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<MemberSpecification, InternalError> {
     let mut errors: Vec<InternalError> = mpo.errors.clone();
 

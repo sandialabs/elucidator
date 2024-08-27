@@ -121,7 +121,6 @@ pub fn get_sizing(data: &str, start_col: usize) -> SizingParserOutput {
 }
 
 pub fn get_word(data: &str, start_col: usize) -> WordParserOutput {
-    let word;
     let mut errors = Vec::new();
     let id_start = data.char_indices().find(|(_, x)| !x.is_whitespace());
     if id_start.is_none() {
@@ -132,21 +131,20 @@ pub fn get_word(data: &str, start_col: usize) -> WordParserOutput {
             }
         );
     };
-    if errors.is_empty() {
+    let word = if errors.is_empty() {
         let (id_byte_start, _) = id_start.unwrap();
         let trimmed = data.trim();
         let id_byte_end = trimmed.len() + id_byte_start;
         let id_char_start = &data[..id_byte_start].chars().count();
         let id_char_end = &data[..id_byte_end].chars().count();
-        word = Some(TokenData::new(
+        Some(TokenData::new(
             &data[id_byte_start..id_byte_end],
             id_char_start + start_col,
             id_char_end + start_col
-        ));
-    }
-    else {
-        word = None;
-    }
+        ))
+    } else {
+        None
+    };
 
     WordParserOutput {
         word,
@@ -255,7 +253,7 @@ pub fn get_memberspec(data: &str, start_col: usize) -> MemberSpecParserOutput<'_
 }
 
 pub fn get_metadataspec(data: &str) -> MetadataSpecParserOutput<'_> {
-    let errors: Vec<InternalError>;
+    
     let member_outputs: Vec<MemberSpecParserOutput>; 
 
     let mut start_positions = data
@@ -277,7 +275,7 @@ pub fn get_metadataspec(data: &str) -> MetadataSpecParserOutput<'_> {
             .collect();
     }
 
-    errors = member_outputs
+    let errors: Vec<InternalError> = member_outputs
         .iter()
         .flat_map(|member_output| member_output.errors.iter()).cloned()
         .collect();

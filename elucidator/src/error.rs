@@ -48,9 +48,9 @@ impl ElucidatorError {
         }
     }
     pub fn merge_with(left: &ElucidatorError, right: &ElucidatorError) -> ElucidatorError {
-        Self::merge(&vec![left.clone(), right.clone()])
+        Self::merge(&[left.clone(), right.clone()])
     }
-    pub fn merge(errs: &Vec<ElucidatorError>) -> ElucidatorError {
+    pub fn merge(errs: &[ElucidatorError]) -> ElucidatorError {
         let errors: Vec<ElucidatorError> = errs.iter()
             .flat_map(ElucidatorError::expand)
             .collect();
@@ -115,7 +115,7 @@ impl InternalError {
             }
         }
     }
-    pub fn merge(errs: &Vec<InternalError>) -> InternalError {
+    pub fn merge(errs: &[InternalError]) -> InternalError {
         let errors: Vec<InternalError> = errs.iter()
             .flat_map(InternalError::expand)
             .collect();
