@@ -76,11 +76,6 @@ pub(crate) struct SizingToken<'a> {
     pub data: TokenData<'a>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub(crate) struct DelimiterToken<'a> {
-    pub data: TokenData<'a>,
-}
-
 #[cfg(test)]
 mod test {
     use super::*;

@@ -27,6 +27,22 @@ fn buff_size_or_err<T>(buffer: &[u8]) -> Result<usize, ElucidatorError> {
 }
 
 impl Dtype {
+    pub fn get_size(&self) -> Option<usize> {
+        match &self {
+            Self::Byte => { Some(std::mem::size_of::<u8>()) },
+            Self::UnsignedInteger16 => { Some(std::mem::size_of::<u16>()) },
+            Self::UnsignedInteger32 => { Some(std::mem::size_of::<u32>()) },
+            Self::UnsignedInteger64 => { Some(std::mem::size_of::<u64>()) },
+            Self::SignedInteger8 => { Some(std::mem::size_of::<i8>()) },
+            Self::SignedInteger16 => { Some(std::mem::size_of::<i16>()) },
+            Self::SignedInteger32 => { Some(std::mem::size_of::<i32>()) },
+            Self::SignedInteger64 => { Some(std::mem::size_of::<i64>()) },
+            Self::Float32 => { Some(std::mem::size_of::<f32>()) },
+            Self::Float64 => { Some(std::mem::size_of::<f64>()) },
+            Self::Str => { None },
+        }
+    }
+    
     pub fn from_buffer(&self, buffer: &[u8]) -> Result<Box<dyn Representable>, ElucidatorError> {
         match self {
             Self::Byte => {

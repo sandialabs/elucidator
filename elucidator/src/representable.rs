@@ -271,8 +271,59 @@ impl Representable for String {
 mod tests {
     use super::*;
 
+    mod as_buffer {
+        use crate::test_utils;
 
-    mod vec {
+        use super::*;
+
+        #[test]
+        fn u8_as_buffer_ok() {
+            let value: u8 = 35;
+            let expected = value.to_le_bytes();
+            assert_eq!(value.as_buffer(), expected);
+        }
+
+        #[test]
+        fn u32_as_buffer_ok() {
+            let value: u32 = 35;
+            let expected = value.to_le_bytes();
+            assert_eq!(value.as_buffer(), expected);
+        }
+
+        #[test]
+        fn u16_vec_as_buffer_ok() {
+            let value: Vec<u16>  = vec![0xFFFF, 0xAB];
+            let expected: Vec<u8> = vec![
+                0xFF, 0xFF,
+                0xAB, 0x00,
+            ];
+            assert_eq!(value.as_buffer(), expected);
+        }
+
+        #[test]
+        fn string_as_buffer_ok() {
+            let value = "cat".to_string();
+            let expected: Vec<u8> = vec![
+                0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+                'c' as u8,
+                'a' as u8,
+                't' as u8,
+            ];
+            assert_eq!(value.as_buffer(), expected);
+        }
+
+        #[test]
+        fn string_utf8_as_buffer_ok() {
+            let value = test_utils::crab_emoji();
+            let expected: Vec<u8> = vec![
+                0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+                0xF0, 0x9F, 0xA6, 0x80
+            ];
+            assert_eq!(value.as_buffer(), expected);
+        }
+    }
+
+    mod vec_conversion {
         use super::*;
 
         macro_rules! conversion_vec_test {
@@ -537,7 +588,7 @@ mod tests {
         conversion_vec_test!(f64, as_string, vec_f64_to_string, ElucidatorError::new_conversion("f64 array", "string"));
     }
 
-    mod primitive {
+    mod primitive_conversion {
         use super::*;
         macro_rules! conversion_test {
         ($source_type:ty, $conversion_fn:ident, $fn_name:ident, $expected:expr) => {

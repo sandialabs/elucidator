@@ -1,11 +1,28 @@
+use std::collections::HashMap;
+use std::io::{Cursor, Read};
+
 use crate::{
     error::*,
-    member::MemberSpecification,
+    member::{MemberSpecification, Sizing, Dtype},
     parsing,
     validating,
+    representable::Representable,
 };
 
+use elucidator_macros::make_dtype_interpreter;
+
 type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
+
+make_dtype_interpreter!(u8);
+make_dtype_interpreter!(u16);
+make_dtype_interpreter!(u32);
+make_dtype_interpreter!(u64);
+make_dtype_interpreter!(i8);
+make_dtype_interpreter!(i16);
+make_dtype_interpreter!(i32);
+make_dtype_interpreter!(i64);
+make_dtype_interpreter!(f32);
+make_dtype_interpreter!(f64);
 
 /// Representation of a Designation's specification.
 /// Use to parse a specification for an individual designation.
@@ -107,6 +124,38 @@ fn convert_error(error: &InternalError, text: &str) -> ElucidatorError {
     }
 }
 
+fn get_sizing_from_buff(cursor: &mut Cursor<&[u8]>) -> Result<usize> {
+    let size_bytes = 8;
+    let mut member_size_buffer: Vec<u8> = Vec::with_capacity(size_bytes);
+    get_n_bytes_from_buff(cursor, &mut member_size_buffer, size_bytes)?;
+    Ok(u64::from_le_bytes(member_size_buffer[0..8].try_into().unwrap()) as usize)
+}
+
+fn get_n_bytes_from_buff(cursor: &mut Cursor<&[u8]>, buffer: &mut Vec<u8>, n: usize) -> Result<()> {
+    let start_pos = cursor.position();
+
+    let mut handle = cursor.take(n as u64);
+    match handle.read_to_end(buffer) {
+        Ok(m) => { 
+            if n != m {
+                Err(ElucidatorError::BufferSizing { 
+                    expected: n, 
+                    found: m
+                })?
+            }
+        },
+        Err(e) => {
+            eprintln!("{e}");
+            Err(ElucidatorError::BufferSizing { 
+                expected: buffer.len(), 
+                found: (cursor.position() - start_pos) as usize
+            })?
+        }
+    };
+    cursor.set_position(start_pos + n as u64);
+    Ok(())
+}
+
 impl DesignationSpecification {
     pub fn from_str(text: &str) -> Result<Self> {
         let parsed = parsing::get_metadataspec(text);
@@ -116,13 +165,106 @@ impl DesignationSpecification {
             Err(e) => Err(convert_error(&e, text)),
         }
     }
+
+    pub fn interpret(&self, buffer: &[u8]) -> Result<HashMap<&str, Box<dyn Representable>>> {
+        let mut map = HashMap::new();
+        let mut cursor = Cursor::new(buffer);
+        for member in &self.members {
+            let items_to_read: usize = match member.sizing {
+                Sizing::Singleton => { 1 },
+                Sizing::Fixed(n) => { n as usize },
+                Sizing::Dynamic => {
+                    get_sizing_from_buff(&mut cursor)?
+                }
+            };
+
+            let value: Box<dyn Representable> = match &member.dtype {
+                Dtype::Str => {
+                    let n_bytes = get_sizing_from_buff(&mut cursor)?;
+                    let mut string_buffer: Vec<u8> = Vec::with_capacity(n_bytes);
+                    get_n_bytes_from_buff(&mut cursor, &mut string_buffer, n_bytes)?;
+                    match String::from_utf8(string_buffer) {
+                        Ok(s) => { Box::new(s) },
+                        Err(e) => {
+                            Err(ElucidatorError::FromUtf8 { source: e })?
+                        }
+                    }
+                },
+                Dtype::Byte => { interpret_u8(&mut cursor, items_to_read, &member.sizing)? },
+                Dtype::UnsignedInteger16 => { interpret_u16(&mut cursor, items_to_read, &member.sizing)? },
+                Dtype::UnsignedInteger32 => { interpret_u32(&mut cursor, items_to_read, &member.sizing)? },
+                Dtype::UnsignedInteger64 => { interpret_u64(&mut cursor, items_to_read, &member.sizing)? },
+                Dtype::SignedInteger8 => { interpret_i8(&mut cursor, items_to_read, &member.sizing)? },
+                Dtype::SignedInteger16 => { interpret_i16(&mut cursor, items_to_read, &member.sizing)? },
+                Dtype::SignedInteger32 => { interpret_i32(&mut cursor, items_to_read, &member.sizing)? },
+                Dtype::SignedInteger64 => { interpret_i64(&mut cursor, items_to_read, &member.sizing)? },
+                Dtype::Float32 => { interpret_f32(&mut cursor, items_to_read, &member.sizing)? },
+                Dtype::Float64 => { interpret_f64(&mut cursor, items_to_read, &member.sizing)? },
+            };
+            map.insert(member.identifier.as_str(), value);
+        }
+        Ok(map)
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use std::{collections::HashSet, ops::Deref};
+
     use super::*;
-    use crate::member::{Sizing, Dtype};
+    use crate::{member::{Dtype, Sizing}, test_utils};
     use pretty_assertions::assert_eq;
+
+    type DataMap<'a> = HashMap<&'a str, Box<dyn Representable>>;
+
+    fn make_dyn_box<T: Representable + 'static>(item: T) -> Box<dyn Representable>{
+        Box::new(item)
+    }
+
+    fn compare_hashmap(left: &DataMap, right: &DataMap) {
+        let left_keys: HashSet<&str> = left.keys().map(|x| *x).collect();
+        let right_keys: HashSet<&str> = right.keys().map(|x| *x).collect();
+
+        pretty_assertions::assert_eq!(left_keys, right_keys);
+
+        for key in left_keys {
+            let lvalue= left.get(key).unwrap();
+            let rvalue = right.get(key).unwrap();
+
+            pretty_assertions::assert_eq!(lvalue.get_dtype(), rvalue.get_dtype());
+            pretty_assertions::assert_eq!(lvalue.is_array(), rvalue.is_array()); 
+            
+            if lvalue.is_array() {
+                match lvalue.get_dtype() {
+                    Dtype::Byte => { pretty_assertions::assert_eq!(lvalue.as_vec_u8().unwrap(), rvalue.as_vec_u8().unwrap()); },
+                    Dtype::UnsignedInteger16 => { pretty_assertions::assert_eq!(lvalue.as_vec_u16().unwrap(), rvalue.as_vec_u16().unwrap()); },
+                    Dtype::UnsignedInteger32 => { pretty_assertions::assert_eq!(lvalue.as_vec_u32().unwrap(), rvalue.as_vec_u32().unwrap()); },
+                    Dtype::UnsignedInteger64 => { pretty_assertions::assert_eq!(lvalue.as_vec_u64().unwrap(), rvalue.as_vec_u64().unwrap()); },
+                    Dtype::SignedInteger8 => { pretty_assertions::assert_eq!(lvalue.as_vec_i8().unwrap(), rvalue.as_vec_i8().unwrap()); },
+                    Dtype::SignedInteger16 => { pretty_assertions::assert_eq!(lvalue.as_vec_i16().unwrap(), rvalue.as_vec_i16().unwrap()); },
+                    Dtype::SignedInteger32 => { pretty_assertions::assert_eq!(lvalue.as_vec_i32().unwrap(), rvalue.as_vec_i32().unwrap()); },
+                    Dtype::SignedInteger64 => { pretty_assertions::assert_eq!(lvalue.as_vec_i64().unwrap(), rvalue.as_vec_i64().unwrap()); },
+                    Dtype::Float32 => { pretty_assertions::assert_eq!(lvalue.as_vec_f32().unwrap(), rvalue.as_vec_f32().unwrap()); },
+                    Dtype::Float64 => { pretty_assertions::assert_eq!(lvalue.as_vec_f64().unwrap(), rvalue.as_vec_f64().unwrap()); }, 
+                    Dtype::Str => { unreachable!("String array"); }, 
+                }
+            } else {
+                match lvalue.get_dtype() {
+                    Dtype::Byte => { pretty_assertions::assert_eq!(lvalue.as_u8().unwrap(), rvalue.as_u8().unwrap()); },
+                    Dtype::UnsignedInteger16 => { pretty_assertions::assert_eq!(lvalue.as_u16().unwrap(), rvalue.as_u16().unwrap()); },
+                    Dtype::UnsignedInteger32 => { pretty_assertions::assert_eq!(lvalue.as_u32().unwrap(), rvalue.as_u32().unwrap()); },
+                    Dtype::UnsignedInteger64 => { pretty_assertions::assert_eq!(lvalue.as_u64().unwrap(), rvalue.as_u64().unwrap()); },
+                    Dtype::SignedInteger8 => { pretty_assertions::assert_eq!(lvalue.as_i8().unwrap(), rvalue.as_i8().unwrap()); },
+                    Dtype::SignedInteger16 => { pretty_assertions::assert_eq!(lvalue.as_i16().unwrap(), rvalue.as_i16().unwrap()); },
+                    Dtype::SignedInteger32 => { pretty_assertions::assert_eq!(lvalue.as_i32().unwrap(), rvalue.as_i32().unwrap()); },
+                    Dtype::SignedInteger64 => { pretty_assertions::assert_eq!(lvalue.as_i64().unwrap(), rvalue.as_i64().unwrap()); },
+                    Dtype::Float32 => { pretty_assertions::assert_eq!(lvalue.as_f32().unwrap(), rvalue.as_f32().unwrap()); },
+                    Dtype::Float64 => { pretty_assertions::assert_eq!(lvalue.as_f64().unwrap(), rvalue.as_f64().unwrap()); }, 
+                    Dtype::Str => { pretty_assertions::assert_eq!(lvalue.as_string().unwrap(), rvalue.as_string().unwrap()); }, 
+                }
+            }
+        }
+    }
 
     #[test]
     fn multiple_members_ok() {
@@ -143,4 +285,67 @@ mod test {
             ]})
         );
     }
+
+    #[test]
+    fn simple_ok() {
+        let text  = "foo: u32, bar: i32";
+        let dspec = DesignationSpecification::from_str(text).unwrap(); 
+        let expected: DataMap = HashMap::from([
+            ("foo", make_dyn_box(10 as u32)),
+            ("bar", make_dyn_box(-10 as i32)),
+        ]);
+        let buffer = expected.get("foo").unwrap().as_u32().unwrap().to_le_bytes().iter()
+            .chain(expected.get("bar").unwrap().as_i32().unwrap().to_le_bytes().iter())
+            .copied()
+            .collect::<Vec<u8>>();
+        let result = dspec.interpret(&buffer).unwrap();
+        compare_hashmap(&expected, &result);
+    }
+
+    #[test]
+    fn simple_fixed_vec_ok() {
+        let text  = "foo: u32[3], bar: string";
+        let dspec = DesignationSpecification::from_str(text).unwrap(); 
+        let expected: DataMap = HashMap::from([
+            ("foo", make_dyn_box(vec![2 as u32, 10 as u32, 0xDEADBEEF as u32])),
+            ("bar", make_dyn_box(test_utils::crab_emoji())),
+        ]);
+        let buffer = expected.get("foo").unwrap().as_vec_u32().unwrap().as_buffer().iter()
+            .chain(expected.get("bar").unwrap().as_string().unwrap().as_buffer().iter())
+            .copied()
+            .collect::<Vec<u8>>();
+        let result = dspec.interpret(&buffer).unwrap();
+        compare_hashmap(&expected, &result); 
+    }
+
+    #[test]
+    fn simple_dynamic_vec_ok() {
+        let text  = "foo: u32[], bar: string";
+        let dspec = DesignationSpecification::from_str(text).unwrap(); 
+        let expected: DataMap = HashMap::from([
+            ("foo", make_dyn_box(vec![2 as u32, 10 as u32, 0xDEADBEEF as u32])),
+            ("bar", make_dyn_box(test_utils::crab_emoji())),
+        ]);
+        let buffer = vec![0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00].iter()
+            .chain(expected.get("foo").unwrap().as_vec_u32().unwrap().as_buffer().iter())
+            .chain(expected.get("bar").unwrap().as_string().unwrap().as_buffer().iter())
+            .copied()
+            .collect::<Vec<u8>>();
+        let result = dspec.interpret(&buffer).unwrap();
+        compare_hashmap(&expected, &result); 
+    }
+
+    #[test]
+    fn interpret_u8_ok() {
+        let text  = "foo: u8";
+        let dspec = DesignationSpecification::from_str(text).unwrap(); 
+        let val: u8 = 10;
+        let result = dspec.interpret(&val.to_le_bytes().to_vec());
+        let result_val = result.unwrap().get("foo").unwrap().as_u8().unwrap();
+        assert_eq!(val, result_val);
+    } 
+
+
+
+     
 }
