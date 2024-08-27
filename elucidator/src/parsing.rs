@@ -67,13 +67,9 @@ impl<'a> MemberSpecParserOutput<'a> {
 }
 
 
-pub fn get_identifier<'a>(data: &'a str, start_col: usize) -> IdentifierParserOutput {
+pub fn get_identifier(data: & str, start_col: usize) -> IdentifierParserOutput {
     let word_output = get_word(data, start_col);
-    let identifier = if let Some(word) = word_output.word {
-        Some(IdentifierToken{ data: word })
-    } else {
-        None
-    };
+    let identifier = word_output.word.map(|word| IdentifierToken{ data: word});
     let errors = word_output.errors;
     IdentifierParserOutput {
         identifier,
@@ -81,13 +77,9 @@ pub fn get_identifier<'a>(data: &'a str, start_col: usize) -> IdentifierParserOu
     }
 }
 
-pub fn get_dtype<'a>(data: &'a str, start_col: usize) -> DtypeParserOutput<'a> {
+pub fn get_dtype(data: &str, start_col: usize) -> DtypeParserOutput {
     let word_output = get_word(data, start_col);
-    let dtype = if let Some(word) = word_output.word {
-        Some(DtypeToken{ data: word })
-    } else {
-        None
-    };
+    let dtype = word_output.word.map(|word| DtypeToken{ data: word });
     let errors = word_output.errors;
     DtypeParserOutput {
         dtype,
@@ -95,7 +87,7 @@ pub fn get_dtype<'a>(data: &'a str, start_col: usize) -> DtypeParserOutput<'a> {
     }
 }
 
-pub fn get_sizing<'a>(data: &'a str, start_col: usize) -> SizingParserOutput<'a> {
+pub fn get_sizing(data: &str, start_col: usize) -> SizingParserOutput {
     if data.chars().all(|x| x.is_whitespace()) {
         let data_len = data.chars().count();
         let last_slice = if data_len == 0 {
@@ -128,7 +120,7 @@ pub fn get_sizing<'a>(data: &'a str, start_col: usize) -> SizingParserOutput<'a>
     }
 }
 
-pub fn get_word<'a>(data: &'a str, start_col: usize) -> WordParserOutput<'a> {
+pub fn get_word(data: &str, start_col: usize) -> WordParserOutput {
     let word;
     let mut errors = Vec::new();
     let id_start = data.char_indices().find(|(_, x)| !x.is_whitespace());

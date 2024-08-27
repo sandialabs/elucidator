@@ -26,12 +26,12 @@ make_dtype_interpreter!(f64);
 
 /// Representation of a Designation's specification.
 /// Use to parse a specification for an individual designation.
-/// To construct, it is typical to use the `from_str` method.
+/// To construct, it is typical to use the `from_text` method.
 /// ```
 /// use elucidator::designation::DesignationSpecification;
 /// # use elucidator::member::{Dtype, MemberSpecification, Sizing};
 ///
-/// let spec = DesignationSpecification::from_str("foo: u32");
+/// let spec = DesignationSpecification::from_text("foo: u32");
 ///
 /// # assert!(spec.is_ok())
 /// ```
@@ -157,7 +157,7 @@ fn get_n_bytes_from_buff(cursor: &mut Cursor<&[u8]>, buffer: &mut Vec<u8>, n: us
 }
 
 impl DesignationSpecification {
-    pub fn from_str(text: &str) -> Result<Self> {
+    pub fn from_text(text: &str) -> Result<Self> {
         let parsed = parsing::get_metadataspec(text);
         let validated = validating::validate_metadataspec(&parsed);
         match validated {
@@ -269,7 +269,7 @@ mod test {
     #[test]
     fn multiple_members_ok() {
         let text = "foo: u32, bar: f32[10], baz: string";
-        let dspec = DesignationSpecification::from_str(text);
+        let dspec = DesignationSpecification::from_text(text);
         assert_eq!(
             dspec,
             Ok(DesignationSpecification{members: vec![
@@ -289,7 +289,7 @@ mod test {
     #[test]
     fn simple_ok() {
         let text  = "foo: u32, bar: i32";
-        let dspec = DesignationSpecification::from_str(text).unwrap(); 
+        let dspec = DesignationSpecification::from_text(text).unwrap(); 
         let expected: DataMap = HashMap::from([
             ("foo", make_dyn_box(10 as u32)),
             ("bar", make_dyn_box(-10 as i32)),
@@ -305,7 +305,7 @@ mod test {
     #[test]
     fn simple_fixed_vec_ok() {
         let text  = "foo: u32[3], bar: string";
-        let dspec = DesignationSpecification::from_str(text).unwrap(); 
+        let dspec = DesignationSpecification::from_text(text).unwrap(); 
         let expected: DataMap = HashMap::from([
             ("foo", make_dyn_box(vec![2 as u32, 10 as u32, 0xDEADBEEF as u32])),
             ("bar", make_dyn_box(test_utils::crab_emoji())),
@@ -321,7 +321,7 @@ mod test {
     #[test]
     fn simple_dynamic_vec_ok() {
         let text  = "foo: u32[], bar: string";
-        let dspec = DesignationSpecification::from_str(text).unwrap(); 
+        let dspec = DesignationSpecification::from_text(text).unwrap(); 
         let expected: DataMap = HashMap::from([
             ("foo", make_dyn_box(vec![2 as u32, 10 as u32, 0xDEADBEEF as u32])),
             ("bar", make_dyn_box(test_utils::crab_emoji())),
@@ -338,7 +338,7 @@ mod test {
     #[test]
     fn interpret_u8_ok() {
         let text  = "foo: u8";
-        let dspec = DesignationSpecification::from_str(text).unwrap(); 
+        let dspec = DesignationSpecification::from_text(text).unwrap(); 
         let val: u8 = 10;
         let result = dspec.interpret(&val.to_le_bytes().to_vec());
         let result_val = result.unwrap().get("foo").unwrap().as_u8().unwrap();
