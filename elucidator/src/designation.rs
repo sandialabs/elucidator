@@ -209,7 +209,7 @@ impl DesignationSpecification {
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashSet, ops::Deref};
+    use std::collections::HashSet;
 
     use super::*;
     use crate::{member::{Dtype, Sizing}, test_utils};
