@@ -3,8 +3,8 @@ use crate::member::{sizing::Sizing, dtype::Dtype};
 #[derive(Debug, Clone, PartialEq)]
 pub struct MemberSpecification {
     pub(crate) identifier: String,
-    sizing: Sizing,
-    dtype: Dtype,
+    pub(crate) sizing: Sizing,
+    pub(crate) dtype: Dtype,
 }
 
 impl MemberSpecification {

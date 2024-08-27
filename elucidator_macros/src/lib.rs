@@ -275,3 +275,43 @@ pub fn representable_vec_impl(item: TokenStream) -> TokenStream {
     };
     gen.into()
 }
+
+#[proc_macro]
+pub fn make_dtype_interpreter(item: TokenStream) -> TokenStream {
+    let t: Type = syn::parse(item).unwrap();
+    let in_path = match &t {
+        Type::Path(tp) => tp,
+        _ => {panic!("make_representable_impl must be a valid path")}
+    };
+    let last_ident = &in_path.path.segments.iter().last().unwrap().ident;
+    let signature: proc_macro2::TokenStream = format!(
+        "fn interpret_{last_ident}(
+            cursor: &mut Cursor<&[u8]>,
+            items_to_read: usize,
+            sizing: &Sizing,
+        ) -> Result<Box<dyn Representable>>
+        "
+    ).parse().unwrap();
+
+    let buffer_conversion = quote! {
+        #signature {
+            let item_width = std::mem::size_of::<#last_ident>();
+            let bytes_to_read = items_to_read * item_width; 
+            let mut result_buffer: std::vec::Vec<u8> = std::vec::Vec::with_capacity(bytes_to_read);
+            get_n_bytes_from_buff(cursor, &mut result_buffer, bytes_to_read)?;
+            let mut item_buff: std::vec::Vec<std::primitive::u8> = std::vec::Vec::with_capacity(std::mem::size_of::<#last_ident>());
+            let mut item_cursor = std::io::Cursor::new(result_buffer.as_slice());
+            let mut result: std::vec::Vec<#last_ident> = Vec::with_capacity(items_to_read);
+            for _ in 0..items_to_read {
+                item_buff.clear();
+                get_n_bytes_from_buff(&mut item_cursor, &mut item_buff, item_width)?;
+                result.push(#last_ident::from_le_bytes(item_buff[0..item_width].try_into().unwrap()));
+            }
+            if sizing == &Sizing::Singleton {
+                return Ok(std::boxed::Box::new(result[0]));
+            } 
+            Ok(std::boxed::Box::new(result))
+        }
+    }.to_token_stream();
+    buffer_conversion.into()
+}
