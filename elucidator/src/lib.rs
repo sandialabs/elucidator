@@ -10,3 +10,4 @@ pub mod error;
 pub mod representable;
 pub mod member;
 pub mod designation;
+pub mod value;
