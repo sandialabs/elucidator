@@ -1,3 +1,10 @@
+use crate::{
+    error::ElucidatorError,
+    representable::Representable,
+};
+
+type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
+
 /// Store data values that have been interpreted
 pub enum DataValue {
     Byte(u8),
@@ -56,7 +63,7 @@ impl PartialEq<DataValue> for DataValue {
 }
 
 impl DataValue {
-    fn as_buffer(&self) -> Vec<u8> {
+    pub fn as_buffer(&self) -> Vec<u8> {
         match self {
             Self::Byte(v) => { v.to_le_bytes().to_vec() },
             Self::UnsignedInteger16(v) => { v.to_le_bytes().to_vec() },
@@ -68,19 +75,80 @@ impl DataValue {
             Self::SignedInteger64(v) => { v.to_le_bytes().to_vec() },
             Self::Float32(v) => { v.to_le_bytes().to_vec() },
             Self::Float64(v) => { v.to_le_bytes().to_vec() },
-            Self::Str(v) => { todo!() },
-            Self::ByteArray(v) => { todo!(); },
-            Self::UnsignedInteger16Array(v) => { todo!(); },
-            Self::UnsignedInteger32Array(v) => { todo!(); },
-            Self::UnsignedInteger64Array(v) => { todo!(); },
-            Self::SignedInteger8Array(v) => { todo!(); },
-            Self::SignedInteger16Array(v) => { todo!(); },
-            Self::SignedInteger32Array(v) => { todo!(); },
-            Self::SignedInteger64Array(v) => { todo!(); },
-            Self::Float32Array(v) => { todo!(); },
-            Self::Float64Array(v) => { todo!(); },
-            _ => { todo!(); },
+            Self::Str(s) => { s.as_buffer() },
+            Self::ByteArray(v) => { v.as_buffer() },
+            Self::UnsignedInteger16Array(v) => { v.as_buffer() },
+            Self::UnsignedInteger32Array(v) => { v.as_buffer() },
+            Self::UnsignedInteger64Array(v) => { v.as_buffer() },
+            Self::SignedInteger8Array(v) => { v.as_buffer() },
+            Self::SignedInteger16Array(v) => { v.as_buffer() },
+            Self::SignedInteger32Array(v) => { v.as_buffer() },
+            Self::SignedInteger64Array(v) => { v.as_buffer() },
+            Self::Float32Array(v) => { v.as_buffer() },
+            Self::Float64Array(v) => { v.as_buffer() },
         }
+    }
+}
+
+pub(crate) trait LeBufferRead: Sized {
+    fn get_one_le(buf: &[u8]) -> Result<Self>;
+    fn get_n_le(buf: &[u8], n: usize) -> Result<Vec<Self>>;
+}
+
+macro_rules! impl_le_bufread {
+    ($($tt:ty), *)  => {
+        $(
+            impl LeBufferRead for $tt {
+                fn get_one_le(buf: &[u8]) -> Result<Self> {
+                    if buf.len() != std::mem::size_of::<$tt>() {
+                        Err(ElucidatorError::BufferSizing{
+                            expected: std::mem::size_of::<$tt>(),
+                            found: buf.len()
+                        })?
+                    }
+                        Ok(<$tt>::from_le_bytes(buf.try_into().unwrap()))
+                }
+                fn get_n_le(buf: &[u8], n: usize) -> Result<Vec<Self>> {
+                    let expected_bytes = std::mem::size_of::<$tt>() * n;
+                    if buf.len() != expected_bytes {
+                        Err(ElucidatorError::BufferSizing{
+                            expected: expected_bytes,
+                            found: buf.len(),
+                        })?
+                    }
+                    Ok(buf.chunks_exact(std::mem::size_of::<$tt>())
+                        .map(|x| <$tt>::from_le_bytes(x.try_into().unwrap()))
+                        .collect()
+                    )
+                }
+            }
+        )*
+    };
+}
+
+impl_le_bufread!{u8, u16, u32, u64, i8, i16, i32, i64, f32, f64}
+
+impl LeBufferRead for String {
+    fn get_one_le(buf: &[u8]) -> Result<Self> {
+        if buf.len() != 8 {
+            Err(ElucidatorError::BufferSizing{
+                expected: 8,
+                found: buf.len()
+            })?
+        }
+        let n_bytes = u64::from_le_bytes(buf[0..8].try_into().unwrap());
+        if n_bytes == 0 {
+            Ok("".to_string())
+        } else {
+            let databuf = &buf[8..];
+            match String::from_utf8(databuf.to_vec()) {
+                Ok(o) => Ok(o),
+                Err(e) => Err(ElucidatorError::FromUtf8{ source: e }),
+            }
+        }
+    }
+    fn get_n_le(buf: &[u8], n: usize) -> Result<Vec<Self>> {
+        unreachable!("We don't do buffers of multiple strings");
     }
 }
 

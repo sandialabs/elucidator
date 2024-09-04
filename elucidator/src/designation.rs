@@ -6,6 +6,7 @@ use crate::{
     member::{MemberSpecification, Sizing, Dtype},
     parsing,
     validating,
+    value::DataValue,
     representable::Representable,
 };
 
@@ -205,6 +206,34 @@ impl DesignationSpecification {
         }
         Ok(map)
     }
+
+    pub fn interpret_enum(&self, buffer: &[u8]) -> Result<HashMap<&str, DataValue>> {
+        let mut map = HashMap::new();
+        let mut cursor = Cursor::new(buffer);
+        for member in &self.members {
+            let items_to_read: usize = match member.sizing {
+                Sizing::Singleton => { 1 },
+                Sizing::Fixed(n) => { n as usize },
+                Sizing::Dynamic => {
+                    get_sizing_from_buff(&mut cursor)?
+                }
+            };
+
+            let getter_fn = if items_to_read == 1 {
+                |buf: &[u8], dt: &Dtype| {
+                    todo!("Implement singleton");
+                }
+            } else {
+                |buf: &[u8], dt: &Dtype| {
+                    todo!("Implement array");
+                }
+            };
+
+            let value = getter_fn(&buffer[(cursor.position() as usize)..], &member.dtype);
+            map.insert(member.identifier.as_str(), value);
+        }
+        Ok(map)
+    }
 }
 
 #[cfg(test)]
@@ -344,8 +373,4 @@ mod test {
         let result_val = result.unwrap().get("foo").unwrap().as_u8().unwrap();
         assert_eq!(val, result_val);
     } 
-
-
-
-     
 }
