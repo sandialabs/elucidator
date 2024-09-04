@@ -6,7 +6,7 @@ use crate::{
     member::{MemberSpecification, Sizing, Dtype},
     parsing,
     validating,
-    value::DataValue,
+    value::{DataValue, LeBufferRead},
     representable::Representable,
 };
 
@@ -157,6 +157,120 @@ fn get_n_bytes_from_buff(cursor: &mut Cursor<&[u8]>, buffer: &mut Vec<u8>, n: us
     Ok(())
 }
 
+// DON'T USE THIS EXCEPT INSIDE OF INTERPRETING ENUMS
+fn get_singleton_from_buf(buf: &[u8], dt: &Dtype) -> Result<DataValue> {
+    match dt {
+        Dtype::Byte => { 
+            Ok(DataValue::Byte(u8::get_one_le(buf)?))
+        },
+        Dtype::UnsignedInteger16 => {
+            Ok(DataValue::UnsignedInteger16(
+                u16::get_one_le(buf)?
+            ))
+        },
+        Dtype::UnsignedInteger32 => {
+            Ok(DataValue::UnsignedInteger32(
+                u32::get_one_le(buf)?
+            ))
+        },
+        Dtype::UnsignedInteger64 => {
+            Ok(DataValue::UnsignedInteger64(
+                u64::get_one_le(buf)?
+            ))
+        },
+        Dtype::SignedInteger8 => { 
+            Ok(DataValue::SignedInteger8(i8::get_one_le(buf)?))
+        },
+        Dtype::SignedInteger16 => {
+            Ok(DataValue::SignedInteger16(
+                i16::get_one_le(buf)?
+            ))
+        },
+        Dtype::SignedInteger32 => {
+            Ok(DataValue::SignedInteger32(
+                i32::get_one_le(buf)?
+            ))
+        },
+        Dtype::SignedInteger64 => {
+            Ok(DataValue::SignedInteger64(
+                i64::get_one_le(buf)?
+            ))
+        },
+        Dtype::Float32 => {
+            Ok(DataValue::Float32(
+                f32::get_one_le(buf)?
+            ))
+        },
+        Dtype::Float64 => {
+            Ok(DataValue::Float64(
+                f64::get_one_le(buf)?
+            ))
+        },
+        Dtype::Str => {
+            Ok(DataValue::Str(
+                String::get_one_le(buf)?
+            ))
+        },
+    }
+}
+
+// DON'T USE THIS EXCEPT INSIDE OF INTERPRETING ENUMS
+fn get_array_from_buf(buf: &[u8], dt: &Dtype, items_to_read: usize) -> Result<DataValue> {
+    match dt {
+        Dtype::Byte => { 
+            Ok(DataValue::ByteArray(u8::get_n_le(buf, items_to_read)?))
+        },
+        Dtype::UnsignedInteger16 => {
+            Ok(DataValue::UnsignedInteger16Array(
+                u16::get_n_le(buf, items_to_read)?
+            ))
+        },
+        Dtype::UnsignedInteger32 => {
+            Ok(DataValue::UnsignedInteger32Array(
+                u32::get_n_le(buf, items_to_read)?
+            ))
+        },
+        Dtype::UnsignedInteger64 => {
+            Ok(DataValue::UnsignedInteger64Array(
+                u64::get_n_le(buf, items_to_read)?
+            ))
+        },
+        Dtype::SignedInteger8 => { 
+            Ok(DataValue::SignedInteger8Array(
+                    i8::get_n_le(buf, items_to_read)?
+            ))
+        },
+        Dtype::SignedInteger16 => {
+            Ok(DataValue::SignedInteger16Array(
+                i16::get_n_le(buf, items_to_read)?
+            ))
+        },
+        Dtype::SignedInteger32 => {
+            Ok(DataValue::SignedInteger32Array(
+                i32::get_n_le(buf, items_to_read)?
+            ))
+        },
+        Dtype::SignedInteger64 => {
+            Ok(DataValue::SignedInteger64Array(
+                i64::get_n_le(buf, items_to_read)?
+            ))
+        },
+        Dtype::Float32 => {
+            Ok(DataValue::Float32Array(
+                f32::get_n_le(buf, items_to_read)?
+            ))
+        },
+        Dtype::Float64 => {
+            Ok(DataValue::Float64Array(
+                f64::get_n_le(buf, items_to_read)?
+            ))
+        },
+        _ => {
+            unreachable!("Match statement has exhausted all array values for buffer reading");
+        },
+    }
+}
+
 impl DesignationSpecification {
     pub fn from_text(text: &str) -> Result<Self> {
         let parsed = parsing::get_metadataspec(text);
@@ -211,25 +325,19 @@ impl DesignationSpecification {
         let mut map = HashMap::new();
         let mut cursor = Cursor::new(buffer);
         for member in &self.members {
-            let items_to_read: usize = match member.sizing {
-                Sizing::Singleton => { 1 },
-                Sizing::Fixed(n) => { n as usize },
+            let value = match member.sizing {
+                Sizing::Singleton => {
+                    get_singleton_from_buf(buffer, &member.dtype)? 
+                },
+                Sizing::Fixed(n) => {
+                    get_array_from_buf(buffer, &member.dtype, n as usize)?
+                },
                 Sizing::Dynamic => {
-                    get_sizing_from_buff(&mut cursor)?
+                    let n = get_sizing_from_buff(&mut cursor)?;
+                    let buf = &buffer[(cursor.position() as usize)..];
+                    get_array_from_buf(buf, &member.dtype, n)?
                 }
             };
-
-            let getter_fn = if items_to_read == 1 {
-                |buf: &[u8], dt: &Dtype| {
-                    todo!("Implement singleton");
-                }
-            } else {
-                |buf: &[u8], dt: &Dtype| {
-                    todo!("Implement array");
-                }
-            };
-
-            let value = getter_fn(&buffer[(cursor.position() as usize)..], &member.dtype);
             map.insert(member.identifier.as_str(), value);
         }
         Ok(map)

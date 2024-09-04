@@ -116,10 +116,17 @@ macro_rules! impl_le_bufread {
                             found: buf.len(),
                         })?
                     }
-                    Ok(buf.chunks_exact(std::mem::size_of::<$tt>())
-                        .map(|x| <$tt>::from_le_bytes(x.try_into().unwrap()))
-                        .collect()
-                    )
+                    if n == 0 && buf.len() == 0 {
+                        Ok(Vec::new())
+                    } else {
+                        Ok(buf
+                            .chunks_exact(std::mem::size_of::<$tt>())
+                            .map(|x| 
+                                <$tt>::from_le_bytes(x.try_into().unwrap())
+                            )
+                            .collect()
+                        )
+                    }
                 }
             }
         )*
@@ -147,7 +154,7 @@ impl LeBufferRead for String {
             }
         }
     }
-    fn get_n_le(buf: &[u8], n: usize) -> Result<Vec<Self>> {
+    fn get_n_le(_buf: &[u8], _n: usize) -> Result<Vec<Self>> {
         unreachable!("We don't do buffers of multiple strings");
     }
 }
