@@ -15,17 +15,6 @@ use elucidator_macros::make_dtype_interpreter;
 
 type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
 
-make_dtype_interpreter!(u8);
-make_dtype_interpreter!(u16);
-make_dtype_interpreter!(u32);
-make_dtype_interpreter!(u64);
-make_dtype_interpreter!(i8);
-make_dtype_interpreter!(i16);
-make_dtype_interpreter!(i32);
-make_dtype_interpreter!(i64);
-make_dtype_interpreter!(f32);
-make_dtype_interpreter!(f64);
-
 /// Representation of a Designation's specification.
 /// Use to parse a specification for an individual designation.
 /// To construct, it is typical to use the `from_text` method.
@@ -126,52 +115,76 @@ fn convert_error(error: &InternalError, text: &str) -> ElucidatorError {
     }
 }
 
-fn get_sizing_from_buff(cursor: &mut Cursor<&[u8]>) -> Result<usize> {
-    let size_bytes = 8;
-    let member_size_buffer = get_n_bytes_from_cursor(cursor, size_bytes)?;
-    Ok(u64::from_le_bytes(member_size_buffer[0..8].try_into().unwrap()) as usize)
+fn get_val_from_buf<T: Representable + LeBufferRead>(buffer: &mut Buffer) -> Result<T> {
+    T::get_one_le(&buffer.grab(T::bytes_needed(1))?)
 }
 
-fn get_n_bytes_from_cursor(cursor: &mut Cursor<&[u8]>, n: usize) -> Result<Vec<u8>> {
-    let buffer: Vec<u8> = cursor
-        .take(n as u64)
-        .bytes()
-        .map(|x| x.unwrap())
-        .collect();
-    if buffer.len() != n {
-        Err(ElucidatorError::BufferSizing { expected: n, found: buffer.len() } )?
-    } else {
-        advance_by(cursor, n);
-        Ok(buffer)
-    }
+fn get_n_vals_from_buf<T: Representable + LeBufferRead>(buffer: &mut Buffer, n: usize) -> Result<Vec<T>> {
+    T::get_n_le(&buffer.grab(T::bytes_needed(n))?, n)
 }
 
-fn get_n_bytes_from_buff(cursor: &mut Cursor<&[u8]>, buffer: &mut Vec<u8>, n: usize) -> Result<()> {
-    let start_pos = cursor.position();
-
-    let mut handle = cursor.take(n as u64);
-    match handle.read_to_end(buffer) {
-        Ok(m) => { 
-            if n != m {
-                Err(ElucidatorError::BufferSizing { 
-                    expected: n, 
-                    found: m
-                })?
-            }
-        },
-        Err(_) => {
-            Err(ElucidatorError::BufferSizing { 
-                expected: buffer.len(), 
-                found: (cursor.position() - start_pos) as usize
-            })?
-        }
+fn get_box_dtype(buffer: &mut Buffer, dt: &Dtype) -> Result<Box<dyn Representable>> {
+    let b: Box<dyn Representable> = match dt {
+            Dtype::Byte => Box::new(get_val_from_buf::<u8>(buffer)?),
+            Dtype::UnsignedInteger16 => {
+                Box::new(get_val_from_buf::<u16>(buffer)?)
+            },
+            Dtype::UnsignedInteger32 => {
+                Box::new(get_val_from_buf::<u32>(buffer)?)
+            },
+            Dtype::UnsignedInteger64 => {
+                Box::new(get_val_from_buf::<u64>(buffer)?)
+            },
+            Dtype::SignedInteger8 => {
+                Box::new(get_val_from_buf::<i8>(buffer)?)
+            },
+            Dtype::SignedInteger16 => {
+                Box::new(get_val_from_buf::<i16>(buffer)?)
+            },
+            Dtype::SignedInteger32 => {
+                Box::new(get_val_from_buf::<i32>(buffer)?)
+            },
+            Dtype::SignedInteger64 => {
+                Box::new(get_val_from_buf::<i64>(buffer)?)
+            },
+            Dtype::Float32 => {
+                Box::new(get_val_from_buf::<f32>(buffer)?)
+            },
+            Dtype::Float64 => {
+                Box::new(get_val_from_buf::<f64>(buffer)?)
+            },
+            Dtype::Str => {
+                Box::new(get_string_from_buf(buffer)?)
+            },
     };
-    cursor.set_position(start_pos + n as u64);
-    Ok(())
+    Ok(b)
 }
 
-fn advance_by(cur: &mut Cursor<&[u8]>, n: usize) {
-    cur.set_position(cur.position() + n as u64);
+fn get_box_n_dtype(buffer: &mut Buffer, n: usize, dt: &Dtype) -> Result<Box<dyn Representable>> {
+    let b: Box<dyn Representable> = match dt {
+        Dtype::Byte => Box::new(get_n_vals_from_buf::<u8>(buffer, n)?),
+        Dtype::UnsignedInteger16 => Box::new(get_n_vals_from_buf::<u16>(buffer, n)?),
+        Dtype::UnsignedInteger32 => Box::new(get_n_vals_from_buf::<u32>(buffer, n)?),
+        Dtype::UnsignedInteger64 => Box::new(get_n_vals_from_buf::<u64>(buffer, n)?),
+        Dtype::SignedInteger8 => Box::new(get_n_vals_from_buf::<i8>(buffer, n)?),
+        Dtype::SignedInteger16 => Box::new(get_n_vals_from_buf::<i16>(buffer, n)?),
+        Dtype::SignedInteger32 => Box::new(get_n_vals_from_buf::<i32>(buffer, n)?),
+        Dtype::SignedInteger64 => Box::new(get_n_vals_from_buf::<i64>(buffer, n)?),
+        Dtype::Float32 => Box::new(get_n_vals_from_buf::<f32>(buffer, n)?),
+        Dtype::Float64 => Box::new(get_n_vals_from_buf::<f64>(buffer, n)?),
+        Dtype::Str => { unreachable!("Can't fetch arrays of strings"); },
+    };
+    Ok(b)
+}
+
+
+fn get_string_from_buf(buffer: &mut Buffer) -> Result<String> {
+    let size = u64::from_le_bytes(buffer.grab(8)?.try_into().unwrap());
+    let databuf = buffer.grab(size as usize)?;
+    match String::from_utf8(databuf) {
+        Ok(s) => Ok(s),
+        Err(e) => Err(ElucidatorError::FromUtf8{ source: e }),
+    }
 }
 
 // DON'T USE THIS EXCEPT INSIDE OF INTERPRETING ENUMS
@@ -324,39 +337,24 @@ impl DesignationSpecification {
 
     pub fn interpret(&self, buffer: &[u8]) -> Result<HashMap<&str, Box<dyn Representable>>> {
         let mut map = HashMap::new();
-        let mut cursor = Cursor::new(buffer);
+        let mut buf = Buffer::new(buffer);
         for member in &self.members {
-            let items_to_read: usize = match member.sizing {
-                Sizing::Singleton => { 1 },
-                Sizing::Fixed(n) => { n as usize },
-                Sizing::Dynamic => {
-                    get_sizing_from_buff(&mut cursor)?
-                }
-            };
-
-            let value: Box<dyn Representable> = match &member.dtype {
-                Dtype::Str => {
-                    let n_bytes = get_sizing_from_buff(&mut cursor)?;
-                    let string_buffer = get_n_bytes_from_cursor(&mut cursor, n_bytes)?;
-                    match String::from_utf8(string_buffer) {
-                        Ok(s) => { Box::new(s) },
-                        Err(e) => {
-                            Err(ElucidatorError::FromUtf8 { source: e })?
-                        }
-                    }
+            let val: Box<dyn Representable> = match member.sizing {
+                Sizing::Singleton => {
+                    get_box_dtype(&mut buf, &member.dtype)?
                 },
-                Dtype::Byte => { interpret_u8(&mut cursor, items_to_read, &member.sizing)? },
-                Dtype::UnsignedInteger16 => { interpret_u16(&mut cursor, items_to_read, &member.sizing)? },
-                Dtype::UnsignedInteger32 => { interpret_u32(&mut cursor, items_to_read, &member.sizing)? },
-                Dtype::UnsignedInteger64 => { interpret_u64(&mut cursor, items_to_read, &member.sizing)? },
-                Dtype::SignedInteger8 => { interpret_i8(&mut cursor, items_to_read, &member.sizing)? },
-                Dtype::SignedInteger16 => { interpret_i16(&mut cursor, items_to_read, &member.sizing)? },
-                Dtype::SignedInteger32 => { interpret_i32(&mut cursor, items_to_read, &member.sizing)? },
-                Dtype::SignedInteger64 => { interpret_i64(&mut cursor, items_to_read, &member.sizing)? },
-                Dtype::Float32 => { interpret_f32(&mut cursor, items_to_read, &member.sizing)? },
-                Dtype::Float64 => { interpret_f64(&mut cursor, items_to_read, &member.sizing)? },
+                Sizing::Fixed(n) => {
+                    let n = n as usize;
+                    get_box_n_dtype(&mut buf, n, &member.dtype)?
+                },
+                Sizing::Dynamic => {
+                    let n = u64::from_le_bytes(
+                        buf.grab(8)?.try_into().unwrap()
+                    ) as usize;
+                    get_box_n_dtype(&mut buf, n, &member.dtype)?
+                },
             };
-            map.insert(member.identifier.as_str(), value);
+            map.insert(member.identifier.as_str(), val);
         }
         Ok(map)
     }
