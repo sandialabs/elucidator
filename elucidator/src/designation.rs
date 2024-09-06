@@ -5,6 +5,7 @@ use crate::{
     error::*,
     member::{MemberSpecification, Sizing, Dtype},
     parsing,
+    util::Buffer,
     validating,
     value::{DataValue, LeBufferRead},
     representable::Representable,
@@ -127,9 +128,22 @@ fn convert_error(error: &InternalError, text: &str) -> ElucidatorError {
 
 fn get_sizing_from_buff(cursor: &mut Cursor<&[u8]>) -> Result<usize> {
     let size_bytes = 8;
-    let mut member_size_buffer: Vec<u8> = Vec::with_capacity(size_bytes);
-    get_n_bytes_from_buff(cursor, &mut member_size_buffer, size_bytes)?;
+    let member_size_buffer = get_n_bytes_from_cursor(cursor, size_bytes)?;
     Ok(u64::from_le_bytes(member_size_buffer[0..8].try_into().unwrap()) as usize)
+}
+
+fn get_n_bytes_from_cursor(cursor: &mut Cursor<&[u8]>, n: usize) -> Result<Vec<u8>> {
+    let buffer: Vec<u8> = cursor
+        .take(n as u64)
+        .bytes()
+        .map(|x| x.unwrap())
+        .collect();
+    if buffer.len() != n {
+        Err(ElucidatorError::BufferSizing { expected: n, found: buffer.len() } )?
+    } else {
+        advance_by(cursor, n);
+        Ok(buffer)
+    }
 }
 
 fn get_n_bytes_from_buff(cursor: &mut Cursor<&[u8]>, buffer: &mut Vec<u8>, n: usize) -> Result<()> {
@@ -145,8 +159,7 @@ fn get_n_bytes_from_buff(cursor: &mut Cursor<&[u8]>, buffer: &mut Vec<u8>, n: us
                 })?
             }
         },
-        Err(e) => {
-            eprintln!("{e}");
+        Err(_) => {
             Err(ElucidatorError::BufferSizing { 
                 expected: buffer.len(), 
                 found: (cursor.position() - start_pos) as usize
@@ -157,110 +170,138 @@ fn get_n_bytes_from_buff(cursor: &mut Cursor<&[u8]>, buffer: &mut Vec<u8>, n: us
     Ok(())
 }
 
+fn advance_by(cur: &mut Cursor<&[u8]>, n: usize) {
+    cur.set_position(cur.position() + n as u64);
+}
+
 // DON'T USE THIS EXCEPT INSIDE OF INTERPRETING ENUMS
-fn get_singleton_from_buf(buf: &[u8], dt: &Dtype) -> Result<DataValue> {
+fn get_singleton_from_buf(buffer: &mut Buffer, dt: &Dtype) -> Result<DataValue> {
     match dt {
-        Dtype::Byte => { 
-            Ok(DataValue::Byte(u8::get_one_le(buf)?))
+        Dtype::Byte => {
+            let buf = buffer.grab(u8::bytes_needed(1))?;
+            Ok(DataValue::Byte(u8::get_one_le(&buf)?))
         },
         Dtype::UnsignedInteger16 => {
+            let buf = buffer.grab(u16::bytes_needed(1))?;
             Ok(DataValue::UnsignedInteger16(
-                u16::get_one_le(buf)?
+                u16::get_one_le(&buf)?
             ))
         },
         Dtype::UnsignedInteger32 => {
+            let buf = buffer.grab(u32::bytes_needed(1))?;
             Ok(DataValue::UnsignedInteger32(
-                u32::get_one_le(buf)?
+                u32::get_one_le(&buf)?
             ))
         },
         Dtype::UnsignedInteger64 => {
+            let buf = buffer.grab(u64::bytes_needed(1))?;
             Ok(DataValue::UnsignedInteger64(
-                u64::get_one_le(buf)?
+                u64::get_one_le(&buf)?
             ))
         },
-        Dtype::SignedInteger8 => { 
-            Ok(DataValue::SignedInteger8(i8::get_one_le(buf)?))
+        Dtype::SignedInteger8 => {
+            let buf = buffer.grab(i8::bytes_needed(1))?;
+            Ok(DataValue::SignedInteger8(i8::get_one_le(&buf)?))
         },
         Dtype::SignedInteger16 => {
+            let buf = buffer.grab(i16::bytes_needed(1))?;
             Ok(DataValue::SignedInteger16(
-                i16::get_one_le(buf)?
+                i16::get_one_le(&buf)?
             ))
         },
         Dtype::SignedInteger32 => {
+            let buf = buffer.grab(i32::bytes_needed(1))?;
             Ok(DataValue::SignedInteger32(
-                i32::get_one_le(buf)?
+                i32::get_one_le(&buf)?
             ))
         },
         Dtype::SignedInteger64 => {
+            let buf = buffer.grab(i64::bytes_needed(1))?;
             Ok(DataValue::SignedInteger64(
-                i64::get_one_le(buf)?
+                i64::get_one_le(&buf)?
             ))
         },
         Dtype::Float32 => {
+            let buf = buffer.grab(f32::bytes_needed(1))?;
             Ok(DataValue::Float32(
-                f32::get_one_le(buf)?
+                f32::get_one_le(&buf)?
             ))
         },
         Dtype::Float64 => {
+            let buf = buffer.grab(f64::bytes_needed(1))?;
             Ok(DataValue::Float64(
-                f64::get_one_le(buf)?
+                f64::get_one_le(&buf)?
             ))
         },
         Dtype::Str => {
-            Ok(DataValue::Str(
-                String::get_one_le(buf)?
-            ))
+            let string_length = u64::from_le_bytes(buffer.grab(8)?.try_into().unwrap());
+            let string_contents = buffer.grab(string_length as usize)?;
+            let s = match String::from_utf8(string_contents) {
+                Ok(o) => o,
+                Err(e) => Err(ElucidatorError::FromUtf8{ source: e })?,
+            };
+            Ok(DataValue::Str(s))
         },
     }
 }
 
 // DON'T USE THIS EXCEPT INSIDE OF INTERPRETING ENUMS
-fn get_array_from_buf(buf: &[u8], dt: &Dtype, items_to_read: usize) -> Result<DataValue> {
+fn get_array_from_buf(buffer: &mut Buffer, dt: &Dtype, items_to_read: usize) -> Result<DataValue> {
     match dt {
         Dtype::Byte => { 
-            Ok(DataValue::ByteArray(u8::get_n_le(buf, items_to_read)?))
+            let buf = &buffer.grab(u8::bytes_needed(items_to_read))?;
+            Ok(DataValue::ByteArray(u8::get_n_le(&buf, items_to_read)?))
         },
         Dtype::UnsignedInteger16 => {
+            let buf = &buffer.grab(u16::bytes_needed(items_to_read))?;
             Ok(DataValue::UnsignedInteger16Array(
                 u16::get_n_le(buf, items_to_read)?
             ))
         },
         Dtype::UnsignedInteger32 => {
+            let buf = &buffer.grab(u32::bytes_needed(items_to_read))?;
             Ok(DataValue::UnsignedInteger32Array(
                 u32::get_n_le(buf, items_to_read)?
             ))
         },
         Dtype::UnsignedInteger64 => {
+            let buf = &buffer.grab(u64::bytes_needed(items_to_read))?;
             Ok(DataValue::UnsignedInteger64Array(
                 u64::get_n_le(buf, items_to_read)?
             ))
         },
         Dtype::SignedInteger8 => { 
+            let buf = &buffer.grab(i8::bytes_needed(items_to_read))?;
             Ok(DataValue::SignedInteger8Array(
                     i8::get_n_le(buf, items_to_read)?
             ))
         },
         Dtype::SignedInteger16 => {
+            let buf = &buffer.grab(i16::bytes_needed(items_to_read))?;
             Ok(DataValue::SignedInteger16Array(
                 i16::get_n_le(buf, items_to_read)?
             ))
         },
         Dtype::SignedInteger32 => {
+            let buf = &buffer.grab(i32::bytes_needed(items_to_read))?;
             Ok(DataValue::SignedInteger32Array(
                 i32::get_n_le(buf, items_to_read)?
             ))
         },
         Dtype::SignedInteger64 => {
+            let buf = &buffer.grab(i64::bytes_needed(items_to_read))?;
             Ok(DataValue::SignedInteger64Array(
                 i64::get_n_le(buf, items_to_read)?
             ))
         },
         Dtype::Float32 => {
+            let buf = &buffer.grab(f32::bytes_needed(items_to_read))?;
             Ok(DataValue::Float32Array(
                 f32::get_n_le(buf, items_to_read)?
             ))
         },
         Dtype::Float64 => {
+            let buf = &buffer.grab(f64::bytes_needed(items_to_read))?;
             Ok(DataValue::Float64Array(
                 f64::get_n_le(buf, items_to_read)?
             ))
@@ -296,8 +337,7 @@ impl DesignationSpecification {
             let value: Box<dyn Representable> = match &member.dtype {
                 Dtype::Str => {
                     let n_bytes = get_sizing_from_buff(&mut cursor)?;
-                    let mut string_buffer: Vec<u8> = Vec::with_capacity(n_bytes);
-                    get_n_bytes_from_buff(&mut cursor, &mut string_buffer, n_bytes)?;
+                    let string_buffer = get_n_bytes_from_cursor(&mut cursor, n_bytes)?;
                     match String::from_utf8(string_buffer) {
                         Ok(s) => { Box::new(s) },
                         Err(e) => {
@@ -323,22 +363,22 @@ impl DesignationSpecification {
 
     pub fn interpret_enum(&self, buffer: &[u8]) -> Result<HashMap<&str, DataValue>> {
         let mut map = HashMap::new();
-        let mut cursor = Cursor::new(buffer);
+        let mut buf = Buffer::new(buffer);
         for member in &self.members {
+            let member_name = member.identifier.as_str().clone();
             let value = match member.sizing {
                 Sizing::Singleton => {
-                    get_singleton_from_buf(buffer, &member.dtype)? 
+                    get_singleton_from_buf(&mut buf, &member.dtype)? 
                 },
                 Sizing::Fixed(n) => {
-                    get_array_from_buf(buffer, &member.dtype, n as usize)?
+                    get_array_from_buf(&mut buf, &member.dtype, n as usize)?
                 },
                 Sizing::Dynamic => {
-                    let n = get_sizing_from_buff(&mut cursor)?;
-                    let buf = &buffer[(cursor.position() as usize)..];
-                    get_array_from_buf(buf, &member.dtype, n)?
+                    let n = u64::from_le_bytes(buf.grab(8)?.try_into().unwrap());
+                    get_array_from_buf(&mut buf, &member.dtype, n as usize)?
                 }
             };
-            map.insert(member.identifier.as_str(), value);
+            map.insert(member_name, value);
         }
         Ok(map)
     }
@@ -349,7 +389,8 @@ mod test {
     use std::collections::HashSet;
 
     use super::*;
-    use crate::{member::{Dtype, Sizing}, test_utils};
+    use crate::{member::{Dtype, Sizing}, test_utils, value::DataValue};
+    use rand::{random, Rng};
     use pretty_assertions::assert_eq;
 
     type DataMap<'a> = HashMap<&'a str, Box<dyn Representable>>;
@@ -480,5 +521,300 @@ mod test {
         let result = dspec.interpret(val.to_le_bytes().as_ref());
         let result_val = result.unwrap().get("foo").unwrap().as_u8().unwrap();
         assert_eq!(val, result_val);
-    } 
+    }
+
+    fn random_data_value(dt: &Dtype, sizing: &Sizing) -> DataValue {
+        let items = match sizing {
+            Sizing::Singleton => { 1 },
+            Sizing::Fixed(n) => { *n },
+            Sizing::Dynamic => { (random::<u8>() % 100 + 1) as u64 },
+        };
+		match dt {
+			Dtype::Byte => {
+				if sizing == &Sizing::Singleton {
+					DataValue::Byte(random())
+				} else {
+					DataValue::ByteArray((0..items).map(|_| random::<u8>()).collect())
+				}
+			},
+			Dtype::UnsignedInteger16 => {
+				if sizing == &Sizing::Singleton {
+					DataValue::UnsignedInteger16(random())
+				} else {
+					DataValue::UnsignedInteger16Array((0..items).map(|_| random::<u16>()).collect())
+				}
+			},
+			Dtype::UnsignedInteger32 => {
+				if sizing == &Sizing::Singleton {
+					DataValue::UnsignedInteger32(random())
+				} else {
+					DataValue::UnsignedInteger32Array((0..items).map(|_| random::<u32>()).collect())
+				}
+			},
+			Dtype::UnsignedInteger64 => {
+				if sizing == &Sizing::Singleton {
+					DataValue::UnsignedInteger64(random())
+				} else {
+					DataValue::UnsignedInteger64Array((0..items).map(|_| random::<u64>()).collect())
+				}
+			},
+			Dtype::SignedInteger8 => {
+				if sizing == &Sizing::Singleton {
+					DataValue::SignedInteger8(random())
+				} else {
+					DataValue::SignedInteger8Array((0..items).map(|_| random::<i8>()).collect())
+				}
+			},
+			Dtype::SignedInteger16 => {
+				if sizing == &Sizing::Singleton {
+					DataValue::SignedInteger16(random())
+				} else {
+					DataValue::SignedInteger16Array((0..items).map(|_| random::<i16>()).collect())
+				}
+			},
+			Dtype::SignedInteger32 => {
+				if sizing == &Sizing::Singleton {
+					DataValue::SignedInteger32(random())
+				} else {
+					DataValue::SignedInteger32Array((0..items).map(|_| random::<i32>()).collect())
+				}
+			},
+			Dtype::SignedInteger64 => {
+				if sizing == &Sizing::Singleton {
+					DataValue::SignedInteger64(random())
+				} else {
+					DataValue::SignedInteger64Array((0..items).map(|_| random::<i64>()).collect())
+				}
+			},
+			Dtype::Float32 => {
+				if sizing == &Sizing::Singleton {
+					DataValue::Float32(random())
+				} else {
+					DataValue::Float32Array((0..items).map(|_| random::<f32>()).collect())
+				}
+			},
+			Dtype::Float64 => {
+				if sizing == &Sizing::Singleton {
+					DataValue::Float64(random())
+				} else {
+					DataValue::Float64Array((0..items).map(|_| random::<f64>()).collect())
+				}
+			},
+			Dtype::Str => {
+				let n_chars = random::<u8>() % 10;
+				let s = (0..n_chars).map(|_| random::<char>()).collect();
+				DataValue::Str(s)
+			},
+		}
+    }
+
+    fn random_sizing() -> Sizing {
+        let num = random::<u8>() % 3;
+        match num {
+            0 => { Sizing::Singleton },
+            1 => { Sizing::Fixed((random::<u8>() % 100 + 1) as u64) },
+            2 => { Sizing::Dynamic },
+            _ => { unreachable!(); }
+        }
+    }
+
+    fn random_dtype() -> Dtype {
+        let num = random::<u8>() % 11; // There are 11 variants in the Dtype enum
+        match num {
+            0 => Dtype::Byte,
+            1 => Dtype::UnsignedInteger16,
+            2 => Dtype::UnsignedInteger32,
+            3 => Dtype::UnsignedInteger64,
+            4 => Dtype::SignedInteger8,
+            5 => Dtype::SignedInteger16,
+            6 => Dtype::SignedInteger32,
+            7 => Dtype::SignedInteger64,
+            8 => Dtype::Float32,
+            9 => Dtype::Float64,
+            10 => Dtype::Str,
+            _ => unreachable!(),
+        }
+    }
+
+   fn random_dtype_sizing() -> (Sizing, Dtype) {
+	   let dtype = random_dtype();
+	   let sizing = if let Dtype::Str = dtype {
+		   Sizing::Singleton
+	   } else {
+		   random_sizing()
+	   };
+	   (sizing, dtype)
+    }
+
+   fn random_identifier() -> String {
+       let mut rng = rand::thread_rng();
+       let length = (random::<u8>() % 5) + 1;
+       (0..length)
+           .map(|_| (rng.gen_range(b'a'..=b'z') as char))
+           .collect()
+    }
+
+    fn random_member_specification() -> MemberSpecification {
+        let (sizing, dtype) = random_dtype_sizing();
+        let identifier = random_identifier();
+        MemberSpecification {
+            identifier,
+            sizing,
+            dtype,
+        }
+    }
+
+    fn random_designation_specification() -> DesignationSpecification {
+        let num_members = random::<u8>() % 20 + 1;
+        let members = loop {
+            let candidates = (0..num_members)
+                .map(|_| random_member_specification())
+                .collect::<Vec<_>>();
+            let unique_names = candidates.iter()
+                .map(|x| x.identifier.clone())
+                .collect::<HashSet<_>>();
+            if candidates.len() == unique_names.len() {
+                break candidates
+            }
+        };
+        DesignationSpecification { members }
+    }
+
+    fn generate_random_designation_specification_data(designation_spec: &DesignationSpecification) -> HashMap<&str, DataValue> {
+        let mut data_map = HashMap::new();
+
+        for member in &designation_spec.members {
+            let data_value = random_data_value(&member.dtype, &member.sizing);
+            data_map.insert(member.identifier.as_str(), data_value);
+        }
+
+        data_map
+    }
+
+
+    fn into_blob(dv: &DataValue, sizing: &Sizing) -> Vec<u8> {
+        let mut buffer = Vec::new();
+
+        if let Sizing::Dynamic = sizing {
+            let num_elements = match dv {
+                DataValue::ByteArray(v) => v.len() as u64,
+                DataValue::UnsignedInteger16Array(v) => v.len() as u64,
+                DataValue::UnsignedInteger32Array(v) => v.len() as u64,
+                DataValue::UnsignedInteger64Array(v) => v.len() as u64,
+                DataValue::SignedInteger8Array(v) => v.len() as u64,
+                DataValue::SignedInteger16Array(v) => v.len() as u64,
+                DataValue::SignedInteger32Array(v) => v.len() as u64,
+                DataValue::SignedInteger64Array(v) => v.len() as u64,
+                DataValue::Float32Array(v) => v.len() as u64,
+                DataValue::Float64Array(v) => v.len() as u64,
+                _ => {
+                    unreachable!("Only arrays should have dynamic sizing");
+                },
+            };
+            buffer.extend_from_slice(&num_elements.to_le_bytes());
+        }
+
+        buffer.extend_from_slice(&dv.as_buffer());
+        buffer
+    }
+
+    fn generate_designation_and_perform_round_trip() {
+         let designation = random_designation_specification();
+         let n_data = random::<u8>() % 50;
+         let data_vec: Vec<HashMap<&str, DataValue>> = (0..n_data)
+             .map(|_| generate_random_designation_specification_data(&designation))
+             .collect();
+         for datum in &data_vec {
+            let blob_vec: Vec<Vec<u8>> = designation.members.iter()
+                .map(|member| {
+                    let dv = datum.get(member.identifier.as_str()).unwrap();
+                    let sizing = &member.sizing;
+                    into_blob(&dv, sizing)
+                })
+                .collect();
+             let buffer: Vec<u8> = blob_vec.iter()
+                 .flat_map(|x| x.iter())
+                 .copied()
+                 .collect();
+             let map = designation.interpret_enum(&buffer);
+             let dr: Result<HashMap<&str, DataValue>> = Ok(datum.clone());
+             pretty_assertions::assert_eq!(
+                 map,
+                 dr,
+                 "{designation:#?}\nBuffer size {}", buffer.len()
+             );
+         }
+     }
+ 
+    #[test]
+    fn compare_dv_hm() {
+        let left = HashMap::from([
+            ("foo", DataValue::Byte(9)),
+            ("bar", DataValue::Float32Array(vec![-5.0, -10.0, 3.14])),
+        ]);
+        let right = HashMap::from([
+            ("foo", DataValue::Byte(9)),
+            ("bar", DataValue::Float32Array(vec![-5.0, -10.0, 3.14])),
+        ]);
+        pretty_assertions::assert_eq!(
+            left,
+            right,
+        );
+    }
+
+    #[test]
+    fn simple_interpret_enum() {
+        let hm = HashMap::from([
+            ("foo", DataValue::Byte(9)),
+            ("bar", DataValue::Float32Array(vec![-5.0, -10.0, 3.14])),
+        ]);
+        let buff_foo = hm.get("foo").unwrap().as_buffer();
+        let buff_bar = hm.get("bar").unwrap().as_buffer();
+        let buffer: Vec<u8> = buff_foo.iter()
+            .chain(buff_bar.iter())
+            .copied()
+            .collect();
+        let designation = DesignationSpecification::from_text("foo: u8, bar: f32[3]").unwrap();
+        let result = designation.interpret_enum(&buffer);
+        pretty_assertions::assert_eq!(
+            result,
+            Ok(hm),
+        );
+    }
+
+    #[test]
+    fn complex_interpret_enum() {
+        let foo_vec: Vec<i16> = vec![-1, 2, 1025];
+        let bar_vec: Vec<f64> = vec![3.1415, 2.71];
+        let baz_vec: Vec<i8> = vec![-3, 4, -5, 6];
+        let hm = HashMap::from([
+            ("foo", DataValue::SignedInteger16Array(foo_vec.clone())),
+            ("bar", DataValue::Float64Array(bar_vec)),
+            ("baz", DataValue::SignedInteger8Array(baz_vec.clone())),
+        ]);
+        let foo_size_buf = (foo_vec.len() as u64).to_le_bytes();
+        let baz_size_buf = (baz_vec.len() as u64).to_le_bytes();
+        let buffer: Vec<u8> = foo_size_buf.iter()
+            .chain(hm.get("foo").unwrap().as_buffer().iter())
+            .chain(hm.get("bar").unwrap().as_buffer().iter())
+            .chain(baz_size_buf.iter())
+            .chain(hm.get("baz").unwrap().as_buffer().iter())
+            .copied()
+            .collect();
+        let designation = DesignationSpecification::from_text(
+            "foo: i16[], bar: f64[2], baz: i8[]"
+        ).unwrap();
+        let result = designation.interpret_enum(&buffer);
+        pretty_assertions::assert_eq!(
+            result,
+            Ok(hm),
+        );
+    }
+
+    #[test]
+    fn property_test_interpret_enum() {
+        for _ in 0..1000 {
+            generate_designation_and_perform_round_trip()
+        }
+    }
 }

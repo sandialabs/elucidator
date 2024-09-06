@@ -6,6 +6,7 @@ mod parsing;
 mod validating;
 mod test_utils;
 mod token;
+mod util;
 pub mod error;
 pub mod representable;
 pub mod member;

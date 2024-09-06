@@ -6,6 +6,7 @@ use crate::{
 type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
 
 /// Store data values that have been interpreted
+#[derive(Clone, Debug, PartialEq)]
 pub enum DataValue {
     Byte(u8),
     UnsignedInteger16(u16),
@@ -28,38 +29,6 @@ pub enum DataValue {
     SignedInteger64Array(Vec<i64>),
     Float32Array(Vec<f32>),
     Float64Array(Vec<f64>),
-}
-
-impl PartialEq<DataValue> for DataValue {
-    fn eq(&self, other: &DataValue) -> bool {
-        if std::mem::discriminant(self) != std::mem::discriminant(other) {
-            return false;
-        }
-        match (self, other) {
-            (Self::Byte(left), Self::Byte(right)) => { left == right },
-            (Self::UnsignedInteger16(left), Self::UnsignedInteger16(right)) => { left == right },
-            (Self::UnsignedInteger32(left), Self::UnsignedInteger32(right)) => { left == right },
-            (Self::UnsignedInteger64(left), Self::UnsignedInteger64(right)) => { left == right },
-            (Self::SignedInteger8(left), Self::SignedInteger8(right)) => { left == right },
-            (Self::SignedInteger16(left), Self::SignedInteger16(right)) => { left == right },
-            (Self::SignedInteger32(left), Self::SignedInteger32(right)) => { left == right },
-            (Self::SignedInteger64(left), Self::SignedInteger64(right)) => { left == right },
-            (Self::Float32(left), Self::Float32(right)) => { left == right },
-            (Self::Float64(left), Self::Float64(right)) => { left == right },
-            (Self::Str(left), Self::Str(right)) => { left == right },
-            (Self::ByteArray(left), Self::ByteArray(right)) => { left == right },
-            (Self::UnsignedInteger16Array(left), Self::UnsignedInteger16Array(right)) => { left == right },
-            (Self::UnsignedInteger32Array(left), Self::UnsignedInteger32Array(right)) => { left == right },
-            (Self::UnsignedInteger64Array(left), Self::UnsignedInteger64Array(right)) => { left == right },
-            (Self::SignedInteger8Array(left), Self::SignedInteger8Array(right)) => { left == right },
-            (Self::SignedInteger16Array(left), Self::SignedInteger16Array(right)) => { left == right },
-            (Self::SignedInteger32Array(left), Self::SignedInteger32Array(right)) => { left == right },
-            (Self::SignedInteger64Array(left), Self::SignedInteger64Array(right)) => { left == right },
-            (Self::Float32Array(left), Self::Float32Array(right)) => { left == right },
-            (Self::Float64Array(left), Self::Float64Array(right)) => { left == right },
-            _ => { unreachable!("PartialEq for DataValue should not encounter different discriminants due to initial check."); },
-        }
-    }
 }
 
 impl DataValue {
@@ -93,6 +62,7 @@ impl DataValue {
 pub(crate) trait LeBufferRead: Sized {
     fn get_one_le(buf: &[u8]) -> Result<Self>;
     fn get_n_le(buf: &[u8], n: usize) -> Result<Vec<Self>>;
+    fn bytes_needed(n: usize) -> usize;
 }
 
 macro_rules! impl_le_bufread {
@@ -100,17 +70,20 @@ macro_rules! impl_le_bufread {
         $(
             impl LeBufferRead for $tt {
                 fn get_one_le(buf: &[u8]) -> Result<Self> {
-                    if buf.len() != std::mem::size_of::<$tt>() {
+                    let expected_bytes = std::mem::size_of::<$tt>();
+                    if buf.len() < std::mem::size_of::<$tt>() {
                         Err(ElucidatorError::BufferSizing{
                             expected: std::mem::size_of::<$tt>(),
                             found: buf.len()
                         })?
                     }
-                        Ok(<$tt>::from_le_bytes(buf.try_into().unwrap()))
+                    Ok(
+                        <$tt>::from_le_bytes(buf[..expected_bytes].try_into().unwrap())
+                    )
                 }
                 fn get_n_le(buf: &[u8], n: usize) -> Result<Vec<Self>> {
                     let expected_bytes = std::mem::size_of::<$tt>() * n;
-                    if buf.len() != expected_bytes {
+                    if buf.len() < expected_bytes {
                         Err(ElucidatorError::BufferSizing{
                             expected: expected_bytes,
                             found: buf.len(),
@@ -119,7 +92,7 @@ macro_rules! impl_le_bufread {
                     if n == 0 && buf.len() == 0 {
                         Ok(Vec::new())
                     } else {
-                        Ok(buf
+                        Ok(buf[..expected_bytes]
                             .chunks_exact(std::mem::size_of::<$tt>())
                             .map(|x| 
                                 <$tt>::from_le_bytes(x.try_into().unwrap())
@@ -127,6 +100,9 @@ macro_rules! impl_le_bufread {
                             .collect()
                         )
                     }
+                }
+                fn bytes_needed(n: usize) -> usize {
+                    std::mem::size_of::<$tt>() * n
                 }
             }
         )*
@@ -157,11 +133,61 @@ impl LeBufferRead for String {
     fn get_n_le(_buf: &[u8], _n: usize) -> Result<Vec<Self>> {
         unreachable!("We don't do buffers of multiple strings");
     }
+    fn bytes_needed(_n: usize) -> usize {
+        unimplemented!();
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-
     use crate::representable::Representable;
+    use rand::random;
+    use pretty_assertions;
+
+    macro_rules! singleton_round_trip {
+        ($($tt:ty), *) => {
+            $(
+                let item: $tt = random();
+                let buf = item.to_le_bytes().to_vec();
+                let extracted = <$tt>::get_one_le(&buf);
+                pretty_assertions::assert_eq!(
+                    extracted,
+                    Ok(item),
+                    "Buffer is {buf:#?}, type is {}", stringify!($tt),
+                );
+            )*
+        }
+    }
+
+    macro_rules! vec_round_trip {
+        ($($tt:ty), *) => {
+            $(
+                let size: u8 = random();
+                let vec: Vec<$tt> = (0..size)
+                    .map(|_| random::<$tt>())
+                    .collect();
+                let buf: Vec<u8> = vec.iter()
+                    .flat_map(|x| x.to_le_bytes())
+                    .collect();
+                let extracted = <$tt>::get_n_le(&buf, size as usize);
+                assert_eq!(
+                    extracted,
+                    Ok(vec),
+                    "Type is {}", stringify!($tt),
+                );
+            )*
+        }
+    }
+
+
+    #[test]
+    fn test_singleton_round_trips() {
+        singleton_round_trip!(u8, u16, u32, u64, i8, i16, i32, i64, f32, f64);
+    }
+
+    #[test]
+    fn test_vec_round_trips() {
+        vec_round_trip!(u8, u16, u32, u64, i8, i16, i32, i64, f32, f64);
+    }
 }
