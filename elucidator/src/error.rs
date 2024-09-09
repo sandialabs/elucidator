@@ -39,8 +39,7 @@ impl ElucidatorError {
         match &self {
             Self::MultipleErrors(errs) => {
                 errs.iter()
-                    .map(|e| e.expand())
-                    .flatten()
+                    .flat_map(|e| e.expand())
                     .collect()
             },
             _ => {
@@ -49,12 +48,11 @@ impl ElucidatorError {
         }
     }
     pub fn merge_with(left: &ElucidatorError, right: &ElucidatorError) -> ElucidatorError {
-        Self::merge(&vec![left.clone(), right.clone()])
+        Self::merge(&[left.clone(), right.clone()])
     }
-    pub fn merge(errs: &Vec<ElucidatorError>) -> ElucidatorError {
+    pub fn merge(errs: &[ElucidatorError]) -> ElucidatorError {
         let errors: Vec<ElucidatorError> = errs.iter()
-            .map(ElucidatorError::expand)
-            .flatten()
+            .flat_map(ElucidatorError::expand)
             .collect();
         if errors.len() == 1 {
             errors[0].clone()
@@ -101,7 +99,7 @@ pub(crate) enum InternalError {
     /// Errors related to illegal specification
     IllegalSpecification{offender: TokenClone, reason: SpecificationFailure},
     /// Multiple errors have occurred
-    MultipleFailures(Box<Vec<InternalError>>),
+    MultipleFailures(Vec<InternalError>),
 }
 
 impl InternalError {
@@ -109,8 +107,7 @@ impl InternalError {
         match &self {
             Self::MultipleFailures(errs) => {
                 errs.iter()
-                    .map(|e| e.expand())
-                    .flatten()
+                    .flat_map(|e| e.expand())
                     .collect()
             },
             _ => {
@@ -118,15 +115,14 @@ impl InternalError {
             }
         }
     }
-    pub fn merge(errs: &Vec<InternalError>) -> InternalError {
+    pub fn merge(errs: &[InternalError]) -> InternalError {
         let errors: Vec<InternalError> = errs.iter()
-            .map(InternalError::expand)
-            .flatten()
+            .flat_map(InternalError::expand)
             .collect();
         if errors.len() == 1 {
             errors[0].clone()
         } else {
-            InternalError::MultipleFailures(Box::new(errors))
+            InternalError::MultipleFailures(errors)
         }
     }
 }
@@ -195,11 +191,11 @@ impl fmt::Display for SpecificationFailure {
                 )
             },
             Self::IdentifierStartsNonAlphabetical => {
-                format!("Identifiers must start with alphabetical character")
+                "Identifiers must start with alphabetical character".to_string()
             },
             Self::IllegalDataType => { "Illegal data type".to_string() },
             Self::ZeroLengthIdentifier => { 
-                format!("Identifiers must have non-zero length")
+                "Identifiers must have non-zero length".to_string()
             },
             Self::IllegalCharacters(clist) => {
                 let offending_list = clist

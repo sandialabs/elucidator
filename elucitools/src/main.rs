@@ -11,7 +11,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    match DesignationSpecification::from_str(&args.input) {
+    match DesignationSpecification::from_text(&args.input) {
         Ok(_) => println!("All good!"),
         Err(e) => print!("{e}"),
     }
