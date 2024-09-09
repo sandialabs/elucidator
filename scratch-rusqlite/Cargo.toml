@@ -4,4 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+elucidator = { version = "0.1.0", path = "../elucidator" }
 rusqlite = "0.32.1"
