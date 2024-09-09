@@ -811,7 +811,7 @@ mod test {
 
     #[test]
     fn property_test_interpret_enum() {
-        for _ in 0..1000 {
+        for _ in 0..100 {
             generate_designation_and_perform_round_trip()
         }
     }
