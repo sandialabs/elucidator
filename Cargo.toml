@@ -4,7 +4,7 @@ members = [
     "elucidator",
     "elucidator-db",
     "elucitools",
-    "elucidator_macros",
+    "elucidator_macros", "scratch-rusqlite",
 ]
 resolver = "2"
 
