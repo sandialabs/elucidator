@@ -305,9 +305,9 @@ mod tests {
             let value = "cat".to_string();
             let expected: Vec<u8> = vec![
                 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-                'c' as u8,
-                'a' as u8,
-                't' as u8,
+                b'c',
+                b'a',
+                b't',
             ];
             assert_eq!(value.as_buffer(), expected);
         }

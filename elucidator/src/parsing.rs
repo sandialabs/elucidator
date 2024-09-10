@@ -67,13 +67,9 @@ impl<'a> MemberSpecParserOutput<'a> {
 }
 
 
-pub fn get_identifier<'a>(data: &'a str, start_col: usize) -> IdentifierParserOutput {
+pub fn get_identifier(data: & str, start_col: usize) -> IdentifierParserOutput {
     let word_output = get_word(data, start_col);
-    let identifier = if let Some(word) = word_output.word {
-        Some(IdentifierToken{ data: word })
-    } else {
-        None
-    };
+    let identifier = word_output.word.map(|word| IdentifierToken{ data: word});
     let errors = word_output.errors;
     IdentifierParserOutput {
         identifier,
@@ -81,13 +77,9 @@ pub fn get_identifier<'a>(data: &'a str, start_col: usize) -> IdentifierParserOu
     }
 }
 
-pub fn get_dtype<'a>(data: &'a str, start_col: usize) -> DtypeParserOutput<'a> {
+pub fn get_dtype(data: &str, start_col: usize) -> DtypeParserOutput {
     let word_output = get_word(data, start_col);
-    let dtype = if let Some(word) = word_output.word {
-        Some(DtypeToken{ data: word })
-    } else {
-        None
-    };
+    let dtype = word_output.word.map(|word| DtypeToken{ data: word });
     let errors = word_output.errors;
     DtypeParserOutput {
         dtype,
@@ -95,7 +87,7 @@ pub fn get_dtype<'a>(data: &'a str, start_col: usize) -> DtypeParserOutput<'a> {
     }
 }
 
-pub fn get_sizing<'a>(data: &'a str, start_col: usize) -> SizingParserOutput<'a> {
+pub fn get_sizing(data: &str, start_col: usize) -> SizingParserOutput {
     if data.chars().all(|x| x.is_whitespace()) {
         let data_len = data.chars().count();
         let last_slice = if data_len == 0 {
@@ -128,8 +120,7 @@ pub fn get_sizing<'a>(data: &'a str, start_col: usize) -> SizingParserOutput<'a>
     }
 }
 
-pub fn get_word<'a>(data: &'a str, start_col: usize) -> WordParserOutput<'a> {
-    let word;
+pub fn get_word(data: &str, start_col: usize) -> WordParserOutput {
     let mut errors = Vec::new();
     let id_start = data.char_indices().find(|(_, x)| !x.is_whitespace());
     if id_start.is_none() {
@@ -140,21 +131,20 @@ pub fn get_word<'a>(data: &'a str, start_col: usize) -> WordParserOutput<'a> {
             }
         );
     };
-    if errors.is_empty() {
+    let word = if errors.is_empty() {
         let (id_byte_start, _) = id_start.unwrap();
         let trimmed = data.trim();
         let id_byte_end = trimmed.len() + id_byte_start;
         let id_char_start = &data[..id_byte_start].chars().count();
         let id_char_end = &data[..id_byte_end].chars().count();
-        word = Some(TokenData::new(
+        Some(TokenData::new(
             &data[id_byte_start..id_byte_end],
             id_char_start + start_col,
             id_char_end + start_col
-        ));
-    }
-    else {
-        word = None;
-    }
+        ))
+    } else {
+        None
+    };
 
     WordParserOutput {
         word,
@@ -163,13 +153,13 @@ pub fn get_word<'a>(data: &'a str, start_col: usize) -> WordParserOutput<'a> {
 }
 
 
-pub fn get_typespec<'a>(data: &'a str, start_col: usize) -> TypeSpecParserOutput {
-    let dtype ;
+pub fn get_typespec(data: &str, start_col: usize) -> TypeSpecParserOutput {
+    
     let sizing ;
     let is_singleton;
     let end_of_dtype ;
     let mut errors = Vec::new();
-    if let Some((_, contents)) = data.split_once("[") {
+    if let Some((_, contents)) = data.split_once('[') {
         is_singleton = false;
         let lbracket_pos = data.chars().position(|c| c == '[').unwrap();
         let lbracket_byte_pos = data.chars().take(lbracket_pos+1).collect::<String>().len();
@@ -208,7 +198,7 @@ pub fn get_typespec<'a>(data: &'a str, start_col: usize) -> TypeSpecParserOutput
     }
 
     let dpo = get_dtype(&data[..end_of_dtype], start_col);
-    dtype = dpo.dtype;
+    let dtype = dpo.dtype;
     for error in &dpo.errors {
         errors.push(error.clone());
     } 
@@ -221,12 +211,12 @@ pub fn get_typespec<'a>(data: &'a str, start_col: usize) -> TypeSpecParserOutput
     }
 }
 
-pub fn get_memberspec<'a>(data: &'a str, start_col: usize) -> MemberSpecParserOutput<'a> {
+pub fn get_memberspec(data: &str, start_col: usize) -> MemberSpecParserOutput<'_> {
     let mut identifier = None;
     let mut typespec = None;
     let mut errors = Vec::new();
 
-    if let Some((left_of_colon, right_of_colon)) = data.split_once(":") {
+    if let Some((left_of_colon, right_of_colon)) = data.split_once(':') {
         let colon_pos = data.chars().position(|c| c == ':').unwrap();
         // Identifier parsing
         let ipo = get_identifier(left_of_colon, start_col);
@@ -262,8 +252,8 @@ pub fn get_memberspec<'a>(data: &'a str, start_col: usize) -> MemberSpecParserOu
     }
 }
 
-pub fn get_metadataspec<'a>(data: &'a str) -> MetadataSpecParserOutput<'a> {
-    let errors: Vec<InternalError>;
+pub fn get_metadataspec(data: &str) -> MetadataSpecParserOutput<'_> {
+    
     let member_outputs: Vec<MemberSpecParserOutput>; 
 
     let mut start_positions = data
@@ -279,16 +269,15 @@ pub fn get_metadataspec<'a>(data: &'a str) -> MetadataSpecParserOutput<'a> {
         member_outputs = vec![get_memberspec(data, 0)]
     } else {
         member_outputs = data
-            .split(",")
+            .split(',')
             .zip(start_positions)
             .map(|(member_spec, pos)| get_memberspec(member_spec, pos))
             .collect();
     }
 
-    errors = member_outputs
+    let errors: Vec<InternalError> = member_outputs
         .iter()
-        .flat_map(|member_output| member_output.errors.iter())
-        .map(|e| e.clone())
+        .flat_map(|member_output| member_output.errors.iter()).cloned()
         .collect();
 
     MetadataSpecParserOutput {
@@ -395,8 +384,8 @@ mod test {
 
     /// Produce a potential whitespace fill
     fn fill() -> String {
-        let whitespace = random_whitespace(random::<usize>() % 4);
-        whitespace
+        
+        random_whitespace(random::<usize>() % 4)
     }
 
     mod word {
@@ -1087,8 +1076,7 @@ mod test {
             let metadata_spec = get_metadataspec(&spec);
             let expected_errors: Vec<InternalError> = parsed_members
                 .iter()
-                .flat_map(|x| x.errors.iter())
-                .map(|x| x.clone())
+                .flat_map(|x| x.errors.iter()).cloned()
                 .collect();
             pretty_assertions::assert_eq!(
                 metadata_spec,
