@@ -10,7 +10,7 @@ struct DesignationSpec {
     spec: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Metadata<'a> {
     pub xmin: f64,
     pub xmax: f64,
@@ -50,18 +50,20 @@ impl Database {
     fn from(filename: &str) -> Result<Self> {
         let conn = Connection::open(filename)?;
         let mut designations = HashMap::new();
-        let mut stmt = conn.prepare_cached(
-            "SELECT designation, spec FROM designation_spec;"
-        )?;
-        let mut rows = stmt.query([])?;
-        while let Some(row) = rows.next()? {
-            let designation: String = row.get(0)?;
-            let spec_text: String = row.get(1)?;
-            let spec = DesignationSpecification::from_text(&spec_text).unwrap();
-            designations.insert(designation, spec);
+        {
+            let mut stmt = conn.prepare_cached(
+                "SELECT designation, spec FROM designation_spec;"
+            )?;
+            let mut rows = stmt.query([])?;
+            while let Some(row) = rows.next()? {
+                let designation: String = row.get(0)?;
+                let spec_text: String = row.get(1)?;
+                let spec = DesignationSpecification::from_text(&spec_text).unwrap();
+                designations.insert(designation, spec);
+            }
         }
         Ok(Database { 
-            conn: Connection::open(filename)?,
+            conn,
             designations,
         })
     }
@@ -121,6 +123,38 @@ impl Database {
                 &datum.buffer, 
             ),
         )?;
+        Ok(())
+    }
+    fn insert_n_metadata(&self, data: &Vec<Metadata>) -> Result<()> {
+        const N_FIELDS: usize = 10;
+        let unbound = (0..data.len()).map(|idx| {
+            let unbound_value = (idx*N_FIELDS + 1..=(idx+1)*N_FIELDS)
+                .map(|i| format!("?{i}"))
+                .collect::<Vec<String>>()
+                .join(", ");
+            format!("({unbound_value})")
+        })
+        .collect::<Vec<String>>()
+        .join(", ");
+
+        let sql_statement = format!(
+            "INSERT INTO Metadata (xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax, designation, buffer) VALUES {unbound};"
+        );
+
+        let mut stmt = self.conn.prepare_cached(&sql_statement)?;
+        for (i, m) in data.iter().enumerate() {
+            stmt.raw_bind_parameter(1 + i*N_FIELDS, &m.xmin)?;
+            stmt.raw_bind_parameter(2 + i*N_FIELDS, &m.xmax)?;
+            stmt.raw_bind_parameter(3 + i*N_FIELDS, &m.ymin)?;
+            stmt.raw_bind_parameter(4 + i*N_FIELDS, &m.ymax)?;
+            stmt.raw_bind_parameter(5 + i*N_FIELDS, &m.zmin)?;
+            stmt.raw_bind_parameter(6 + i*N_FIELDS, &m.zmax)?;
+            stmt.raw_bind_parameter(7 + i*N_FIELDS, &m.tmin)?;
+            stmt.raw_bind_parameter(8 + i*N_FIELDS, &m.tmax)?;
+            stmt.raw_bind_parameter(9 + i*N_FIELDS, &m.designation)?;
+            stmt.raw_bind_parameter(10 + i*N_FIELDS, &m.buffer)?;
+        }
+        stmt.raw_execute()?;
         Ok(())
     }
     fn get_metadata_in_bb(
@@ -213,13 +247,67 @@ fn main() -> Result<()> {
 
     let _ = db.save_as("my_database.db");
     let mydb = Database::from("my_database.db")?;
+
     let my_data = mydb.get_metadata_in_bb(
-        -1.0, 1.0,
-        -1.0, 1.0,
-        -1.0, 1.0,
-        -1.0, 1.0,
+        -9.9, 9.9,
+        -9.9, 9.9,
+        -9.9, 9.9,
+        -9.9, 9.9,
         designation,
-        None
+       Some(1.0) 
+    ).unwrap();
+    println!("{my_data:#?}"); 
+
+    println!("----  ----  ----  ----  ----");
+    let buffer = &[123, 0, 0, 0, unsafe { std::mem::transmute::<i8, u8>(-123) }];
+    let md1 = Metadata {
+        xmin: 0.1,
+        xmax: 0.1,
+        ymin: 0.1,
+        ymax: 0.1,
+        zmin: 0.1,
+        zmax: 0.1,
+        tmin: 0.1,
+        tmax: 0.1, 
+        designation,
+        buffer,
+    };
+    let buffer = &[42, 0, 0, 0, unsafe { std::mem::transmute::<i8, u8>(-42) }];
+    let md2 = Metadata {
+        xmin: 10.0,
+        xmax: 10.0,
+        ymin: 10.0,
+        ymax: 10.0,
+        zmin: 10.0,
+        zmax: 10.0,
+        tmin: 10.0,
+        tmax: 10.0, 
+        designation,
+        buffer,
+    };
+    let buffer = &[255, 255, 0, 0, unsafe { std::mem::transmute::<i8, u8>(127) }];
+    let md3 = Metadata {
+        xmin: 123.456,
+        xmax: 123.456,
+        ymin: 123.456,
+        ymax: 123.456,
+        zmin: 123.456,
+        zmax: 123.456,
+        tmin: 123.456,
+        tmax: 123.456, 
+        designation,
+        buffer,
+    };
+    let data = vec![md1, md2, md3];
+    mydb.insert_n_metadata(&data)?;
+
+    let my_data = mydb.get_metadata_in_bb(
+        -9.9, 9.9,
+        -9.9, 9.9,
+        -9.9, 9.9,
+        -9.9, 9.9,
+        designation,
+       Some(1.0) 
     ).unwrap();
     println!("{my_data:#?}"); 
 
