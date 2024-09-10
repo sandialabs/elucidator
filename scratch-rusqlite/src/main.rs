@@ -1,5 +1,5 @@
-use std::collections::HashMap;
-use elucidator::{value::DataValue, designation::DesignationSpecification};
+use std::{borrow::Borrow, collections::HashMap};
+use elucidator::{designation::{self, DesignationSpecification}, value::DataValue};
 use rusqlite::{Connection, Result};
 
 type Datum<'a> = HashMap<&'a str, DataValue>;
@@ -24,14 +24,14 @@ struct Metadata<'a> {
     pub buffer: &'a [u8],
 }
 
-struct Database<'a> {
+struct Database {
     /// Active database connection
     conn: Connection,
     /// Mapping of designations
-    designations: HashMap<&'a str, DesignationSpecification>,
+    designations: HashMap<String, DesignationSpecification>,
 }
 
-impl<'a, 'b> Database<'a> {
+impl Database {
     fn new(filename: Option<&str>) -> Result<Self> {
         let db = if let Some(name) = filename {
             Database {
@@ -48,8 +48,26 @@ impl<'a, 'b> Database<'a> {
         Ok(db)
     }
     fn from(filename: &str) -> Result<Self> {
-        todo!("Implement pulling specs from db and creating designation map");
-        Ok(Database { conn: Connection::open(filename)?, designations: HashMap::new() })
+        let conn = Connection::open(filename)?;
+        let mut designations = HashMap::new();
+        let mut stmt = conn.prepare_cached(
+            "SELECT designation, spec FROM designation_spec;"
+        )?;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let designation: String = row.get(0)?;
+            let spec_text: String = row.get(1)?;
+            let spec = DesignationSpecification::from_text(&spec_text).unwrap();
+            designations.insert(designation, spec);
+        }
+        Ok(Database { 
+            conn: Connection::open(filename)?,
+            designations,
+        })
+    }
+    fn save_as(&self, filename: &str) -> Result<()> {
+        self.conn.backup(rusqlite::DatabaseName::Main, filename, None)?;
+        Ok(())
     }
     fn initialize(&self) -> Result<()> {
         self.conn.execute(
@@ -76,14 +94,15 @@ impl<'a, 'b> Database<'a> {
         )?;
         Ok(())
     }
-    fn insert_spec_text(&mut self, designation: &'a str, spec: &'b str) -> Result<()> {
+
+    fn insert_spec_text(&mut self, designation: &str, spec: &str) -> Result<()> {
 
         self.conn.execute(
             "INSERT INTO designation_spec (designation, spec) VALUES (?1, ?2)",
             (designation, spec),
         )?;
         let spec = DesignationSpecification::from_text(spec).unwrap();
-        self.designations.insert(designation, spec);
+        self.designations.insert(designation.to_string(), spec);
         Ok(())
     }
     fn insert_metadata(&self, datum: &Metadata) -> Result<()> {
@@ -191,6 +210,18 @@ fn main() -> Result<()> {
         None
     ).unwrap();
     println!("{data:#?}");
+
+    let _ = db.save_as("my_database.db");
+    let mydb = Database::from("my_database.db")?;
+    let my_data = mydb.get_metadata_in_bb(
+        -1.0, 1.0,
+        -1.0, 1.0,
+        -1.0, 1.0,
+        -1.0, 1.0,
+        designation,
+        None
+    ).unwrap();
+    println!("{my_data:#?}"); 
 
     Ok(())
 }
