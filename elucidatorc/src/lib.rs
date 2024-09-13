@@ -7,12 +7,12 @@ use std::{
     collections::HashMap,
     ffi::CStr,
     os::raw::{c_char, c_int},
-    sync::{LazyLock, Mutex},
+    sync::{LazyLock, RwLock},
 };
 
-type Dmap = LazyLock<Mutex<HashMap<String, DesignationSpecification>>>;
+type Dmap = LazyLock<RwLock<HashMap<String, DesignationSpecification>>>;
 static DESIGNATION_MAP: Dmap = LazyLock::new(|| {
-    Mutex::new(HashMap::new())
+    RwLock::new(HashMap::new())
 });
 
 #[no_mangle]
@@ -33,7 +33,7 @@ pub extern "C" fn add_designation_from_text(name: *const c_char, spec: *const c_
     };
     println!("Designation parsed as {designation:#?}");
     DESIGNATION_MAP
-        .lock()
+        .write()
         .unwrap()
         .insert(name.to_string(), designation);
     0
