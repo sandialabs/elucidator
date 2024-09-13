@@ -138,6 +138,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "elucidatorc"
+version = "0.1.0"
+dependencies = [
+ "elucidator",
+]
+
+[[package]]
 name = "elucitools"
 version = "0.1.0"
 dependencies = [
