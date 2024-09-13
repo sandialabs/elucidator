@@ -2,13 +2,11 @@
 #include "elucidator.h"
 
 int main() {
-    int failures = 0;
-    failures += add_designation_from_text("foo", "bar: i32");
-    failures += add_designation_from_text("baz", "cat: u32[], dog: f32[]");
-    if ( failures ) {
-        fprintf(stderr, "Failed!\n");
-    }
-    else {
-        printf("Succeeded!\n");
-    }
+    struct DesignationHandle hdl = get_designation_from_text("foo", "bar: u32");
+    struct DesignationHandle hdl2 = get_designation_from_text(
+        "baz",
+        "age: u8, net_worth_usd: i32, name: string"
+    );
+    print_designation(&hdl);
+    print_designation(&hdl2);
 }
