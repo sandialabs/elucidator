@@ -10,7 +10,8 @@ use std::{
     os::raw::{c_char, c_int},
     ptr,
     sync::{
-        LazyLock, Mutex, RwLock
+        atomic::{AtomicU32, Ordering},
+        LazyLock, RwLock
     },
 };
 
@@ -24,7 +25,7 @@ static ERROR_MAP: Emap = LazyLock::new(|| {
     RwLock::new(HashMap::new())
 });
 
-static HANDLE_NUM: Mutex<u32> = Mutex::new(1);
+static HANDLE_NUM: AtomicU32 = AtomicU32::new(1);
 
 pub trait Handle: Hash + Eq { 
     fn get_new() -> Self;
@@ -43,9 +44,7 @@ macro_rules! impl_handle {
             }
             impl Handle for $tt {
                 fn get_new() -> Self {
-                    let mut n = HANDLE_NUM.lock().unwrap();
-                    let hdl = *n;
-                    *n += 1;
+                    let hdl = HANDLE_NUM.fetch_add(1, Ordering::SeqCst);
                     Self { hdl: hdl.clone() }
                 }
                 fn id(&self) -> u32 { self.hdl }
