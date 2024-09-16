@@ -145,6 +145,12 @@ dependencies = [
 [[package]]
 name = "elucidator-db"
 version = "0.1.0"
+dependencies = [
+ "elucidator",
+ "pretty_assertions",
+ "rand",
+ "rusqlite",
+]
 
 [[package]]
 name = "elucidator_macros"
@@ -323,14 +329,6 @@ dependencies = [
  "hashlink",
  "libsqlite3-sys",
  "smallvec",
-]
-
-[[package]]
-name = "scratch-rusqlite"
-version = "0.1.0"
-dependencies = [
- "elucidator",
- "rusqlite",
 ]
 
 [[package]]
