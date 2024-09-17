@@ -1,5 +1,3 @@
-use elucidator::error::ElucidatorError;
-use rusqlite::Error;
 use std::fmt;
 
 #[derive(Debug, PartialEq)]
