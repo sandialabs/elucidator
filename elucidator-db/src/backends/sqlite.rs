@@ -5,7 +5,7 @@ use rusqlite::Connection;
 use elucidator::designation::DesignationSpecification;
 use crate::database::{Database, Metadata, Datum, Result, DatabaseConfig};
 
-struct SqlDatabase {
+pub struct SqlDatabase {
     /// Active database connection
     conn: Connection,
     /// Mapping of designations
