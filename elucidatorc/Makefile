@@ -1,7 +1,7 @@
 libdir = $(realpath ../target/release)
 
 header:
-	cbindgen --lang c --cpp-compat --style tag -o elucidator_auto.h
+	cbindgen --lang c --cpp-compat -o elucidator_auto.h
 	cat elucidator_auto.h > elucidator.h
 	cat elucidator_manual.h >> elucidator.h
 
