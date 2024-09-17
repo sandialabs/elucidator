@@ -1,9 +1,7 @@
 libdir = $(realpath ../target/release)
 
 header:
-	cbindgen --lang c --cpp-compat -o elucidator_auto.h
-	cat elucidator_auto.h > elucidator.h
-	cat elucidator_manual.h >> elucidator.h
+	cbindgen -c cbindgen.toml -o elucidator.h
 
 lib: header
 	cargo build -r

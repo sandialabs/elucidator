@@ -1,0 +1,6 @@
+include_version = true
+language = "C"
+line_length = 80
+cpp_compat = true
+tab_width = 4
+after_includes = "#define ALLOCATE_HANDLE() malloc(4)"

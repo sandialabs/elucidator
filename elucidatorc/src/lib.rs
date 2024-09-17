@@ -25,6 +25,12 @@ static ERROR_MAP: Emap = LazyLock::new(|| {
     RwLock::new(HashMap::new())
 });
 
+type DesignationMap = HashMap<String, DesignationSpecification>;
+type Smap = LazyLock<RwLock<HashMap<SessionHandle, DesignationMap>>>;
+static SESSION_MAP: Smap = LazyLock::new(|| {
+    RwLock::new(HashMap::new())
+});
+
 static HANDLE_NUM: AtomicU32 = AtomicU32::new(1);
 
 pub trait Handle: Hash + Eq { 
@@ -68,6 +74,14 @@ pub struct ErrorHandle {
 }
 
 impl_handle!(ErrorHandle);
+
+#[repr(C)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SessionHandle {
+    hdl: u32
+}
+
+impl_handle!(SessionHandle);
 
 /// Create a designation from a given name and specification. On success, the function will return
 /// 0 and place a valid handle into the pointer provided for dh. On failure, an error handle will
@@ -118,5 +132,54 @@ pub extern "C" fn print_designation(handle: *const DesignationHandle) {
     unsafe {
         let spec = map.get(&(*handle));
         println!("{spec:#?}");
+    };
+}
+
+#[no_mangle]
+pub extern "C" fn new_session(sh: *mut SessionHandle) {
+    unsafe {
+        *sh = SessionHandle::get_new();
+        SESSION_MAP.write().unwrap().insert((*sh).clone(), HashMap::new());
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn add_spec_to_session(
+    name: *const c_char,
+    spec: *const c_char,
+    session: *const SessionHandle,
+    eh: *mut ErrorHandle,
+) -> c_int {
+    let name = String::from_utf8_lossy(
+        unsafe { CStr::from_ptr(name) }.to_bytes()
+    );
+    let spec = String::from_utf8_lossy(
+        unsafe { CStr::from_ptr(spec) }.to_bytes()
+    );
+    let designation = match DesignationSpecification::from_text(&spec) {
+        Ok(o) => o,
+        Err(e) => {
+            unsafe {
+                *eh = ErrorHandle::get_new();
+                ERROR_MAP.write().unwrap().insert((*eh).clone(), e);
+            }
+            return 1;
+        },
+    };
+    unsafe {
+        SESSION_MAP.write().unwrap()
+            .get_mut(&*session)
+            .unwrap()
+            .insert(name.to_string(), designation);
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn print_session(sh: *const SessionHandle) {
+    let sm = SESSION_MAP.read().unwrap();
+    unsafe {
+        let map = sm.get(&*sh).unwrap();
+        println!("{map:#?}");
     };
 }
