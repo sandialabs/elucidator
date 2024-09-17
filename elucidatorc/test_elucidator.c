@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 #include "elucidator.h"
 
@@ -8,8 +9,10 @@
     } while (0)
 
 int main() {
-    struct DesignationHandle * dh;
-    struct ErrorHandle * eh;
+    DesignationHandle * dh = ALLOCATE_HANDLE();
+    ErrorHandle * eh = ALLOCATE_HANDLE();
+    SessionHandle * sh = ALLOCATE_HANDLE();
+    char * err_string = NULL;
     int err = get_designation_from_text("bar: u32", dh, eh);
     if ( err ) {
         printf("%s\n", get_error_string(eh));
@@ -19,9 +22,23 @@ int main() {
     }
     err = get_designation_from_text("invalid", dh, eh);
     if ( err ) {
-        printf("%s\n", get_error_string(eh));
+        err_string = get_error_string(eh);
+        printf("%s\n", err_string);
     }
     else {
         print_designation(dh);
     }
+    new_session(sh);
+    err = add_spec_to_session("animal", "name: string", sh, eh);
+    if ( err ) {
+        err_string = get_error_string(eh);
+        printf("%s\n", err_string);
+    }
+    else {
+        print_session(sh);
+    }
+    free(dh);
+    free(eh);
+    free(sh);
+    free(err_string);
 }
