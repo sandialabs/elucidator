@@ -141,7 +141,6 @@ impl LeBufferRead for String {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::representable::Representable;
     use rand::random;
     use pretty_assertions;
 
