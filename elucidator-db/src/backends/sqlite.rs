@@ -39,6 +39,9 @@ impl SqlDatabase {
     const MIN_VERSION: [u32; 3] = [3, 11, 0];
     fn initialize(&self) -> Result<()> {
         self.verify_version()?;
+        if self.config.use_wal {
+            self.conn.execute("PRAGMA journal_mode=WAL", [])?;
+        }
         self.conn.execute(
             "CREATE TABLE designation_spec (
                 designation  TEXT NOT NULL PRIMARY KEY,
