@@ -3,8 +3,8 @@ use elucidator::{
     representable::Representable
 };
 use elucidator_db::{
-    database::{Database, Metadata},
-    backends::sqlite,
+    database::{Config, Database, DatabaseConfig, Metadata},
+    backends::sqlite::{SqliteConfig, SqlDatabase},
 };
 use rand::random;
 use std::{
@@ -94,7 +94,12 @@ fn main() {
         .map(|x| metadata_from(x))
         .collect();
     let start_time = Instant::now();
-    let mut db = sqlite::SqlDatabase::new(None, None).unwrap();
+    let cfg = DatabaseConfig::SqliteConfig(
+        SqliteConfig::new()
+            .page_size(4096 * 2)
+            .no_sync()
+    );
+    let mut db = SqlDatabase::new(None, Some(&cfg)).unwrap();
     db.insert_spec_text("pdf", &spec).unwrap();
     for datum in &random_metadata {
         db.insert_metadata(datum).unwrap();

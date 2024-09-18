@@ -45,12 +45,27 @@ impl Config for SqliteConfig {
     }
 }
 
+impl SqliteConfig {
+    pub fn use_wal(&mut self) -> Self {
+        self.use_wal = true;
+        self.clone()
+    }
+    pub fn page_size(&mut self, page_size: u16) -> Self {
+        self.page_size = page_size;
+        self.clone()
+    }
+    pub fn no_sync(&mut self) -> Self {
+        self.synchronous_off = true;
+        self.clone()
+    }
+}
+
 impl SqlDatabase {
     const MIN_VERSION: [u32; 3] = [3, 7, 0];
     fn initialize(&self) -> Result<()> {
         self.verify_version()?;
         if self.config.use_wal {
-            self.conn.execute("PRAGMA journal_mode=WAL", [])?;
+            self.conn.execute("PRAGMA journal_mode = WAL", [])?;
         }
         self.conn.execute(
             &format!("PRAGMA page_size = {}", self.config.page_size), 
