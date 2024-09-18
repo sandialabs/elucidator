@@ -2,12 +2,11 @@ use std::collections::HashMap;
 
 use elucidator::value::DataValue;
 use crate::error::*;
+use rstar::{RTreeObject, AABB};
 
 pub type Datum<'a> = HashMap<&'a str, DataValue>;
 pub type Result<T, E = DatabaseError> = std::result::Result<T, E>;
 
-#[cfg(feature = "rtree")]
-use rstar::{RTreeObject, AABB, Point};
 
 #[derive(Debug, Clone)]
 pub struct Metadata<'a> {
@@ -48,13 +47,11 @@ pub trait Config {
 }
 
 pub enum DatabaseConfig {
-    #[cfg(feature = "rtree")]
     RTreeConfig(crate::backends::rtree::RTreeConfig),
     SqliteConfig(crate::backends::sqlite::SqliteConfig),
 }
 
 
-#[cfg(feature = "rtree")]
 impl<'a> RTreeObject for &Metadata<'a> {
     type Envelope = AABB<[f64; 4]>;
 
@@ -67,7 +64,6 @@ impl<'a> RTreeObject for &Metadata<'a> {
     }
 }
 
-#[cfg(feature = "rtree")]
 impl<'a> RTreeObject for Metadata<'a> {
     type Envelope = AABB<[f64; 4]>;
 

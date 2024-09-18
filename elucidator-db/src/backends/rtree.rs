@@ -1,20 +1,18 @@
 use crate::database::{Datum, Metadata, Database, Result, DatabaseConfig};
-use rstar::{RTree, RTreeParams, RTreeObject, AABB};
+use rstar::{RTree, RTreeObject, AABB};
 
 use std::collections::HashMap;
 use elucidator::designation::DesignationSpecification;
 
-#[cfg(feature = "rtree")]
 pub struct RTreeDatabase {
     /// R*-Tree used internally
     rtree: RTree<MetadataClone>,
     designations: HashMap<String, DesignationSpecification>,
 }
 
-#[cfg(feature = "rtree")]
 pub struct RTreeConfig {
     /// R*-Tree used internally
-    config:  u8,
+    _config:  u8,
 }
 #[derive(Debug, Clone)]
 struct MetadataClone {
@@ -64,7 +62,6 @@ impl From<&Metadata<'_>> for MetadataClone {
     }
 }
 
-#[cfg(feature = "rtree")]
 impl<'a> RTreeObject for &MetadataClone {
     type Envelope = AABB<[f64; 4]>;
 
@@ -77,7 +74,6 @@ impl<'a> RTreeObject for &MetadataClone {
     }
 }
 
-#[cfg(feature = "rtree")]
 impl<'a> RTreeObject for MetadataClone {
     type Envelope = AABB<[f64; 4]>;
 
@@ -91,7 +87,6 @@ impl<'a> RTreeObject for MetadataClone {
 }
 
 
-#[cfg(feature = "rtree")]
 impl Database for RTreeDatabase {
     fn new(_: Option<&str>, _: Option<&DatabaseConfig>) -> Result<Self> {
         Ok(Self {
@@ -102,7 +97,7 @@ impl Database for RTreeDatabase {
     fn from_path(_: &str) -> Result<Self> {
         unimplemented!();
     }
-    fn save_as(&self, filename: &str) -> Result<()> {
+    fn save_as(&self, _filename: &str) -> Result<()> {
         unimplemented!();
     }
     fn insert_spec_text(&mut self, designation: &str, spec: &str) -> Result<()> {
@@ -137,6 +132,7 @@ impl Database for RTreeDatabase {
         let d = self.designations.get(designation).unwrap();
         Ok(
             self.rtree.locate_in_envelope(&bb)
+                .filter(|m| m.designation == designation)
                 .map(|m| d.interpret_enum(&m.buffer).unwrap())
                 .collect()
         )

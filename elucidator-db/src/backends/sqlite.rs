@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Read};
 
-use rusqlite::{Connection, params};
+use rusqlite::Connection;
 
 use elucidator::designation::DesignationSpecification;
 use crate::{
