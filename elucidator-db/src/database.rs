@@ -24,10 +24,9 @@ pub trait Database {
     fn new(filename: Option<&str>, config: Option<&DatabaseConfig>) -> Result<Self> where Self: Sized;
     fn from_path(filename: &str) -> Result<Self> where Self: Sized;
     fn save_as(&self, filename: &str) -> Result<()>;
-    fn initialize(&self) -> Result<()>;
     fn insert_spec_text(&mut self, designation: &str, spec: &str) -> Result<()>;
-    fn insert_metadata(&self, datum: &Metadata) -> Result<usize>;
-    fn insert_n_metadata(&self, data: &Vec<Metadata>) -> Result<usize>;
+    fn insert_metadata(&self, datum: &Metadata) -> Result<()>;
+    fn insert_n_metadata(&mut self, data: &Vec<Metadata>) -> Result<()>;
     fn get_metadata_in_bb(
         &self,
         xmin: f64, xmax: f64,
@@ -37,6 +36,11 @@ pub trait Database {
         designation: &str,
         epsilon: Option<f64>,
     ) -> Result<Vec<Datum>>;
+}
+
+pub trait Config {
+    fn new() -> Self where Self: Sized;
+    fn from_json(filename: &str) -> Result<Self> where Self: Sized;
 }
 
 pub enum DatabaseConfig {
