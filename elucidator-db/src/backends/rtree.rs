@@ -47,6 +47,23 @@ impl From<Metadata<'_>> for MetadataClone {
     }
 }
 
+impl From<&Metadata<'_>> for MetadataClone {
+    fn from(m: &Metadata) -> Self {
+        MetadataClone {
+            xmin: m.xmin,
+            xmax: m.xmax,
+            ymin: m.ymin,
+            ymax: m.ymax,
+            zmin: m.zmin,
+            zmax: m.zmax,
+            tmin: m.tmin,
+            tmax: m.tmax,
+            designation: m.designation.to_string(),
+            buffer: m.buffer.into()
+        }
+    }
+}
+
 #[cfg(feature = "rtree")]
 impl<'a> RTreeObject for &MetadataClone {
     type Envelope = AABB<[f64; 4]>;
@@ -94,12 +111,12 @@ impl Database for RTreeDatabase {
         Ok(())
     }
     fn insert_metadata(&mut self, datum: &Metadata) -> Result<()> {
-        self.rtree.insert((*datum).into());
+        self.rtree.insert(datum.into());
         Ok(())
     }
     fn insert_n_metadata(&mut self, data: &Vec<Metadata>) -> Result<()> {
         for datum in data {
-            self.rtree.insert((*datum).into());
+            self.rtree.insert(datum.into());
         }
         Ok(())
     }
