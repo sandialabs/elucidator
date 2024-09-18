@@ -22,6 +22,10 @@ pub struct SqliteConfig {
     use_rtree: bool,
     use_wal: bool,
     page_size: u16,
+    synchronous_off: bool,
+    use_memory_temp_store: bool,
+    threads: u32,
+    cached_pages: u32,
 }
 
 impl Config for SqliteConfig {
@@ -30,6 +34,10 @@ impl Config for SqliteConfig {
             use_rtree: true,
             use_wal: false,
             page_size: 4096,
+            synchronous_off: false,
+            use_memory_temp_store: false,
+            threads: 0,
+            cached_pages: 0,
         }
     }
     fn from_json(filename: &str) -> Result<Self> {
@@ -38,7 +46,7 @@ impl Config for SqliteConfig {
 }
 
 impl SqlDatabase {
-    const MIN_VERSION: [u32; 3] = [3, 0, 0];
+    const MIN_VERSION: [u32; 3] = [3, 7, 0];
     fn initialize(&self) -> Result<()> {
         self.verify_version()?;
         if self.config.use_wal {
@@ -48,6 +56,24 @@ impl SqlDatabase {
             &format!("PRAGMA page_size = {}", self.config.page_size), 
             []
         )?;
+        if self.config.synchronous_off {
+            self.conn.execute("PRAGMA synchronous = OFF", [])?;
+        }
+        if self.config.use_memory_temp_store {
+            self.conn.execute("PRAGMA temp_store = MEMORY", [])?;
+        }
+        if self.config.threads > 0 {
+            self.conn.execute(
+                &format!("PRAGMA threads = {}",
+                self.config.threads), []
+            )?;
+        }
+        if self.config.cached_pages > 0 {
+            self.conn.execute(
+                &format!("PRAGMA cache_size = {}",
+                self.config.cached_pages), []
+            )?;
+        }
         self.conn.execute(
             "CREATE TABLE designation_spec (
                 designation  TEXT NOT NULL PRIMARY KEY,
@@ -88,6 +114,7 @@ impl SqlDatabase {
                 (), // empty list of parameters.
             )?;
         }
+        self.conn.execute("PRAGMA optimize", [])?;
         Ok(())
     }
     fn verify_version(&self) -> Result<(), DatabaseError> {
