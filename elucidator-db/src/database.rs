@@ -55,6 +55,19 @@ pub enum DatabaseConfig {
 
 
 #[cfg(feature = "rtree")]
+impl<'a> RTreeObject for &Metadata<'a> {
+    type Envelope = AABB<[f64; 4]>;
+
+    fn envelope(&self) -> Self::Envelope
+    {
+        AABB::from_corners(
+            (self.xmin, self.ymin, self.zmin, self.tmin).into(),
+            (self.xmax, self.ymax, self.zmax, self.tmax).into(),
+        )
+    }
+}
+
+#[cfg(feature = "rtree")]
 impl<'a> RTreeObject for Metadata<'a> {
     type Envelope = AABB<[f64; 4]>;
 
@@ -66,3 +79,4 @@ impl<'a> RTreeObject for Metadata<'a> {
         )
     }
 }
+
