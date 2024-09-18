@@ -4,6 +4,7 @@ use elucidator::{
 };
 use elucidator_db::{
     database::{Config, Database, DatabaseConfig, Metadata},
+    backends::rtree::RTreeDatabase,
     backends::sqlite::{SqliteConfig, SqlDatabase},
 };
 use rand::random;
@@ -94,12 +95,7 @@ fn main() {
         .map(|x| metadata_from(x))
         .collect();
     let start_time = Instant::now();
-    let cfg = DatabaseConfig::SqliteConfig(
-        SqliteConfig::new()
-            .page_size(4096 * 2)
-            .no_sync()
-    );
-    let mut db = SqlDatabase::new(None, Some(&cfg)).unwrap();
+    let mut db = RTreeDatabase::new(None, None).unwrap();
     db.insert_spec_text("pdf", &spec).unwrap();
     for datum in &random_metadata {
         db.insert_metadata(datum).unwrap();
