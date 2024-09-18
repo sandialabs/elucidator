@@ -21,6 +21,7 @@ struct SqlDatabase {
 pub struct SqliteConfig {
     use_rtree: bool,
     use_wal: bool,
+    page_size: u16,
 }
 
 impl Config for SqliteConfig {
@@ -28,6 +29,7 @@ impl Config for SqliteConfig {
         SqliteConfig {
             use_rtree: true,
             use_wal: false,
+            page_size: 4096,
         }
     }
     fn from_json(filename: &str) -> Result<Self> {
@@ -36,12 +38,16 @@ impl Config for SqliteConfig {
 }
 
 impl SqlDatabase {
-    const MIN_VERSION: [u32; 3] = [3, 11, 0];
+    const MIN_VERSION: [u32; 3] = [3, 0, 0];
     fn initialize(&self) -> Result<()> {
         self.verify_version()?;
         if self.config.use_wal {
             self.conn.execute("PRAGMA journal_mode=WAL", [])?;
         }
+        self.conn.execute(
+            &format!("PRAGMA page_size = {}", self.config.page_size), 
+            []
+        )?;
         self.conn.execute(
             "CREATE TABLE designation_spec (
                 designation  TEXT NOT NULL PRIMARY KEY,
