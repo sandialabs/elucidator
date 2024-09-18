@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Read};
 
 use rusqlite::{Connection, params};
 
@@ -7,6 +7,15 @@ use crate::{
     database::{Database, DatabaseConfig, Datum, Metadata, Result, Config}, 
     error::DatabaseError,
 };
+
+
+use serde::{Serialize, Deserialize};
+use serde_json;
+
+use std::fs::File;
+use std::io::Write;
+
+
 
 pub struct SqlDatabase {
     /// Active database connection
@@ -17,7 +26,7 @@ pub struct SqlDatabase {
     config: SqliteConfig,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct SqliteConfig {
     use_rtree: bool,
     use_wal: bool,
@@ -40,8 +49,17 @@ impl Config for SqliteConfig {
             cached_pages: 0,
         }
     }
-    fn from_json(filename: &str) -> Result<Self> {
-        todo!();
+    fn from_json_file(filename: &str) -> Result<Self> {
+        let mut file = File::open(filename)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        Ok(serde_json::from_str(&contents).unwrap())
+    }
+    fn to_json_file(&self, filename: &str) -> Result<()> {
+        let mut file = File::create(filename)?;
+        let json = serde_json::to_string(&self).unwrap();
+        write!(file, "{json}")?;
+        Ok(())
     }
 }
 
@@ -96,39 +114,21 @@ impl SqlDatabase {
             )",
             (), // empty list of parameters.
         )?;
-        if self.config.use_rtree {
-            self.conn.execute(
-                "CREATE VIRTUAL TABLE MetadataLocations USING rtree(
-                    id INTEGER PRIMARY KEY,
-                    xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax
-                )",
-                (), // empty list of parameters.
-            )?;
-            self.conn.execute(
-                "CREATE TABLE Metadata (
-                    id INTEGER PRIMARY KEY,
-                    designation TEXT,
-                    buffer BLOB
-                )",
-                []
-            )?;
-        } else {
-            self.conn.execute(
-                "CREATE TABLE Metadata (
-                    xmin REAL,
-                    xmax REAL,
-                    ymin REAL,
-                    ymax REAL,
-                    zmin REAL,
-                    zmax REAL,
-                    tmin REAL,
-                    tmax REAL,
-                    designation  TEXT NOT NULL,
-                    buffer  BLOB
-                )",
-                (), // empty list of parameters.
-            )?;
-        }
+        self.conn.execute(
+            "CREATE VIRTUAL TABLE MetadataLocations USING rtree(
+                id INTEGER PRIMARY KEY,
+                xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax
+            )",
+            (), // empty list of parameters.
+        )?;
+        self.conn.execute(
+            "CREATE TABLE Metadata (
+                id INTEGER PRIMARY KEY,
+                designation TEXT,
+                buffer BLOB
+            )",
+            []
+        )?;
         self.conn.execute("PRAGMA optimize", [])?;
         Ok(())
     }
@@ -230,34 +230,25 @@ impl Database for SqlDatabase {
         self.designations.insert(designation.to_string(), designation_spec);
         Ok(())
     }
-    fn insert_metadata(&self, datum: &Metadata) -> Result<()> {
-        self.conn.execute(
-            "INSERT INTO MetadataLocations (xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            [datum.xmin, datum.xmax, datum.ymin, datum.ymax, datum.zmin, datum.zmax, datum.tmin, datum.tmax],
-        )?;
-        let mut stmt = self.conn.prepare_cached(
-            "INSERT INTO Metadata (id, designation, buffer) VALUES (last_insert_rowid(), ?1, ?2)",
-        )?;
-        stmt.raw_bind_parameter(1, datum.designation)?;
-        stmt.raw_bind_parameter(2, datum.buffer)?;
-        stmt.raw_execute()?;
+    fn insert_metadata(&mut self, datum: &Metadata) -> Result<()> {
+        let tx= self.conn.transaction()?;
+
+        {
+            let mut stmt = tx.prepare_cached(
+                "INSERT INTO MetadataLocations (xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            )?;
+            stmt.execute([datum.xmin, datum.xmax, datum.ymin, datum.ymax, datum.zmin, datum.zmax, datum.tmin, datum.tmax])?;
+            let mut stmt = tx.prepare_cached(
+                "INSERT INTO Metadata (id, designation, buffer) VALUES (last_insert_rowid(), ?1, ?2)",
+            )?;
+            stmt.raw_bind_parameter(1, datum.designation)?;
+            stmt.raw_bind_parameter(2, datum.buffer)?;
+            stmt.raw_execute()?; 
+        }
+
+        tx.commit()?;
+
         Ok(())
-        // let result = self.conn.execute(
-        //     "INSERT INTO Metadata (xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax, designation, buffer) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-        //     (
-        //         &datum.xmin,
-        //         &datum.xmax,
-        //         &datum.ymin,
-        //         &datum.ymax,
-        //         &datum.zmin,
-        //         &datum.zmax,
-        //         &datum.tmin,
-        //         &datum.tmax, 
-        //         &datum.designation,
-        //         &datum.buffer, 
-        //     ),
-        // )?;
-        // Ok(result)
     }
     fn insert_n_metadata(&mut self, data: &Vec<Metadata>) -> Result<()> {
         let tx= self.conn.transaction()?;
@@ -279,38 +270,6 @@ impl Database for SqlDatabase {
 
         Ok(())
     }
-    // fn insert_n_metadata(&self, data: &Vec<Metadata>) -> Result<usize> {
-    //     const N_FIELDS: usize = 10;
-    //     let unbound = (0..data.len()).map(|idx| {
-    //         let unbound_value = (idx*N_FIELDS + 1..=(idx+1)*N_FIELDS)
-    //             .map(|i| format!("?{i}"))
-    //             .collect::<Vec<String>>()
-    //             .join(", ");
-    //         format!("({unbound_value})")
-    //     })
-    //     .collect::<Vec<String>>()
-    //     .join(", ");
-
-    //     let sql_statement = format!(
-    //         "INSERT INTO Metadata (xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax, designation, buffer) VALUES {unbound};"
-    //     );
-
-    //     let mut stmt = self.conn.prepare_cached(&sql_statement)?;
-    //     for (i, m) in data.iter().enumerate() {
-    //         stmt.raw_bind_parameter(1 + i*N_FIELDS, &m.xmin)?;
-    //         stmt.raw_bind_parameter(2 + i*N_FIELDS, &m.xmax)?;
-    //         stmt.raw_bind_parameter(3 + i*N_FIELDS, &m.ymin)?;
-    //         stmt.raw_bind_parameter(4 + i*N_FIELDS, &m.ymax)?;
-    //         stmt.raw_bind_parameter(5 + i*N_FIELDS, &m.zmin)?;
-    //         stmt.raw_bind_parameter(6 + i*N_FIELDS, &m.zmax)?;
-    //         stmt.raw_bind_parameter(7 + i*N_FIELDS, &m.tmin)?;
-    //         stmt.raw_bind_parameter(8 + i*N_FIELDS, &m.tmax)?;
-    //         stmt.raw_bind_parameter(9 + i*N_FIELDS, &m.designation)?;
-    //         stmt.raw_bind_parameter(10 + i*N_FIELDS, &m.buffer)?;
-    //     }
-    //     let result = stmt.raw_execute()?;
-    //     Ok(result)
-    // }
     fn get_metadata_in_bb(
         &self,
         xmin: f64, xmax: f64,
@@ -329,22 +288,6 @@ impl Database for SqlDatabase {
         let zmax = zmax + eps;
         let tmin = tmin - eps;
         let tmax = tmax + eps;
-        // let mut stmt = self.conn.prepare_cached(
-        //     "SELECT buffer
-        //     FROM Metadata
-        //     WHERE
-        //         xmin >= ?1 AND
-        //         xmax <= ?2 AND
-        //         ymin >= ?3 AND
-        //         ymax <= ?4 AND
-        //         zmin >= ?5 AND
-        //         zmax <= ?6 AND
-        //         tmin >= ?7 AND
-        //         tmax <= ?8 AND
-        //         designation = ?9
-        //     ;
-        //     "
-        // )?;
 
         let mut stmt = self.conn.prepare_cached(
             "SELECT 
@@ -431,6 +374,20 @@ mod test {
         
     }
     
+    mod config {
+        use super::*;
+        use pretty_assertions::assert_eq;
+
+        #[test]
+        fn to_and_from_json_ok() {
+            let cfg = SqliteConfig::new().use_wal().page_size(2048);
+            let temp_file = TempFile::from("temp.json").unwrap();
+            let _ = cfg.to_json_file(&temp_file.filepath);
+            let recovered_cfg = SqliteConfig::from_json_file(&temp_file.filepath).unwrap();
+            pretty_assertions::assert_eq!(cfg, recovered_cfg);
+        }
+    }
+
     mod database {
         use super::*;
         use std::{collections::HashSet, ops::Deref};

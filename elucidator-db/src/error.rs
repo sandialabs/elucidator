@@ -9,6 +9,9 @@ pub enum DatabaseError {
     ElucidatorError{
         reason: elucidator::error::ElucidatorError,
     },
+    IOError{
+        reason: String,
+    },
     VersionError{
         reason: String
     },
@@ -25,6 +28,9 @@ impl fmt::Display for DatabaseError {
             },
             Self::ElucidatorError{reason} => {
                 format!("Elucidator Error: {reason}")
+            },
+            Self::IOError{reason} => {
+                format!("IO Error: {reason}")
             },
             Self::VersionError { reason } => {
                 format!("Version Error: {reason}")
@@ -48,3 +54,10 @@ impl From<elucidator::error::ElucidatorError> for DatabaseError {
         DatabaseError::ElucidatorError { reason: error }
     }
 }
+
+impl From<std::io::Error> for DatabaseError {
+    fn from(error: std::io::Error) -> Self {
+        DatabaseError::IOError { reason: format!("{error}") }
+    }
+}
+

@@ -6,6 +6,9 @@ use crate::error::*;
 pub type Datum<'a> = HashMap<&'a str, DataValue>;
 pub type Result<T, E = DatabaseError> = std::result::Result<T, E>;
 
+#[cfg(feature = "rtree")]
+use rstar::{RTreeObject, AABB, Point};
+
 #[derive(Debug, Clone)]
 pub struct Metadata<'a> {
     pub xmin: f64,
@@ -25,7 +28,7 @@ pub trait Database {
     fn from_path(filename: &str) -> Result<Self> where Self: Sized;
     fn save_as(&self, filename: &str) -> Result<()>;
     fn insert_spec_text(&mut self, designation: &str, spec: &str) -> Result<()>;
-    fn insert_metadata(&self, datum: &Metadata) -> Result<()>;
+    fn insert_metadata(&mut self, datum: &Metadata) -> Result<()>;
     fn insert_n_metadata(&mut self, data: &Vec<Metadata>) -> Result<()>;
     fn get_metadata_in_bb(
         &self,
@@ -40,11 +43,26 @@ pub trait Database {
 
 pub trait Config {
     fn new() -> Self where Self: Sized;
-    fn from_json(filename: &str) -> Result<Self> where Self: Sized;
+    fn from_json_file(filename: &str) -> Result<Self> where Self: Sized;
+    fn to_json_file(&self, filename: &str) -> Result<()> where Self: Sized;
 }
 
 pub enum DatabaseConfig {
     #[cfg(feature = "rtree")]
-    RtreeConfig(crate::backends::rtree::RtreeConfig),
+    RTreeConfig(crate::backends::rtree::RTreeConfig),
     SqliteConfig(crate::backends::sqlite::SqliteConfig),
+}
+
+
+#[cfg(feature = "rtree")]
+impl<'a> RTreeObject for Metadata<'a> {
+    type Envelope = AABB<[f64; 4]>;
+
+    fn envelope(&self) -> Self::Envelope
+    {
+        AABB::from_corners(
+            (self.xmin, self.ymin, self.zmin, self.tmin).into(),
+            (self.xmax, self.ymax, self.zmax, self.tmax).into(),
+        )
+    }
 }
