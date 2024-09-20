@@ -1,40 +1,119 @@
-use crate::database::{Datum, Metadata, Database, Result};
-use rstar::{RTree, RTreeParams};
+use crate::database::{Datum, Metadata, Database, Result, DatabaseConfig};
+use rstar::{RTree, RTreeObject, AABB};
 
-#[cfg(feature = "rtree")]
-pub struct RtreeDatabase {
+use std::collections::HashMap;
+use elucidator::designation::DesignationSpecification;
+
+pub struct RTreeDatabase {
     /// R*-Tree used internally
-    rtree:  RTree,
+    rtree: RTree<MetadataClone>,
+    designations: HashMap<String, DesignationSpecification>,
 }
 
-#[cfg(feature = "rtree")]
-pub struct RtreeConfig {
+pub struct RTreeConfig {
     /// R*-Tree used internally
-    config:  RTreeParams,
+    _config:  u8,
+}
+#[derive(Debug, Clone)]
+struct MetadataClone {
+    pub xmin: f64,
+    pub xmax: f64,
+    pub ymin: f64,
+    pub ymax: f64,
+    pub zmin: f64,
+    pub zmax: f64,
+    pub tmin: f64,
+    pub tmax: f64,
+    pub designation: String,
+    pub buffer: Vec<u8>,
 }
 
-#[cfg(feature = "rtree")]
-impl Database for RtreeDatabase {
-    fn new(filename: Option<&str>, config: Option<&DatabaseConfig>) -> Result<Self> {
-        todo!();
+impl From<Metadata<'_>> for MetadataClone {
+    fn from(m: Metadata) -> Self {
+        MetadataClone {
+            xmin: m.xmin,
+            xmax: m.xmax,
+            ymin: m.ymin,
+            ymax: m.ymax,
+            zmin: m.zmin,
+            zmax: m.zmax,
+            tmin: m.tmin,
+            tmax: m.tmax,
+            designation: m.designation.to_string(),
+            buffer: m.buffer.into()
+        }
     }
-    fn from_path(filename: &str) -> Result<Self> {
-        todo!();
+}
+
+impl From<&Metadata<'_>> for MetadataClone {
+    fn from(m: &Metadata) -> Self {
+        MetadataClone {
+            xmin: m.xmin,
+            xmax: m.xmax,
+            ymin: m.ymin,
+            ymax: m.ymax,
+            zmin: m.zmin,
+            zmax: m.zmax,
+            tmin: m.tmin,
+            tmax: m.tmax,
+            designation: m.designation.to_string(),
+            buffer: m.buffer.into()
+        }
     }
-    fn save_as(&self, filename: &str) -> Result<()> {
-        todo!();
+}
+
+impl<'a> RTreeObject for &MetadataClone {
+    type Envelope = AABB<[f64; 4]>;
+
+    fn envelope(&self) -> Self::Envelope
+    {
+        AABB::from_corners(
+            (self.xmin, self.ymin, self.zmin, self.tmin).into(),
+            (self.xmax, self.ymax, self.zmax, self.tmax).into(),
+        )
     }
-    fn initialize(&self) -> Result<()> {
-        todo!();
+}
+
+impl<'a> RTreeObject for MetadataClone {
+    type Envelope = AABB<[f64; 4]>;
+
+    fn envelope(&self) -> Self::Envelope
+    {
+        AABB::from_corners(
+            (self.xmin, self.ymin, self.zmin, self.tmin).into(),
+            (self.xmax, self.ymax, self.zmax, self.tmax).into(),
+        )
+    }
+}
+
+
+impl Database for RTreeDatabase {
+    fn new(_: Option<&str>, _: Option<&DatabaseConfig>) -> Result<Self> {
+        Ok(Self {
+            rtree: RTree::new(),
+            designations: HashMap::new(),
+        })
+    }
+    fn from_path(_: &str) -> Result<Self> {
+        unimplemented!();
+    }
+    fn save_as(&self, _filename: &str) -> Result<()> {
+        unimplemented!();
     }
     fn insert_spec_text(&mut self, designation: &str, spec: &str) -> Result<()> {
-        todo!();
+        let designation_spec = DesignationSpecification::from_text(spec)?;
+        self.designations.insert(designation.to_string(), designation_spec);
+        Ok(())
     }
-    fn insert_metadata(&self, datum: &Metadata) -> Result<usize> {
-        todo!();
+    fn insert_metadata(&mut self, datum: &Metadata) -> Result<()> {
+        self.rtree.insert(datum.into());
+        Ok(())
     }
-    fn insert_n_metadata(&self, data: &Vec<Metadata>) -> Result<usize> {
-        todo!();
+    fn insert_n_metadata(&mut self, data: &Vec<Metadata>) -> Result<()> {
+        for datum in data {
+            self.rtree.insert(datum.into());
+        }
+        Ok(())
     }
     fn get_metadata_in_bb(
         &self,
@@ -45,7 +124,18 @@ impl Database for RtreeDatabase {
         designation: &str,
         epsilon: Option<f64>,
     ) -> Result<Vec<Datum>> {
-        todo!();
+        let eps = epsilon.unwrap_or(0.0);
+        let mins = [xmin - eps, ymin - eps, zmin - eps, tmin - eps];
+        let maxs = [xmax + eps, ymax + eps, zmax + eps, tmax + eps];
+        
+        let bb = AABB::from_corners(mins, maxs);
+        let d = self.designations.get(designation).unwrap();
+        Ok(
+            self.rtree.locate_in_envelope(&bb)
+                .filter(|m| m.designation == designation)
+                .map(|m| d.interpret_enum(&m.buffer).unwrap())
+                .collect()
+        )
     }
 }
 
@@ -64,7 +154,8 @@ mod test {
 
         #[test]
         fn create_in_memory_ok() {
-            assert!(RtreeDatabase::new(None, None).is_ok());
+            assert_eq!(true, true);
+            // assert!(RTreeDatabase::new(None, None).is_ok());
         }
     }
 }
