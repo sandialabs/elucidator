@@ -9,10 +9,13 @@ use elucidator_db::{
     database::Database,
 };
 
+use libc;
+
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
     ffi::{CStr, CString},
+    mem,
     os::raw::c_char,
     ptr,
     sync::{
@@ -96,32 +99,91 @@ impl ElucidatorStatus {
 
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq)]
+pub struct Point {
+    x: f64,
+    y: f64,
+    z: f64,
+    t: f64,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct BoundingBox {
-    xmin: f64,
-    xmax: f64,
-    ymin: f64,
-    ymax: f64,
-    zmin: f64,
-    zmax: f64,
-    tmin: f64,
-    tmax: f64,
+    a: Point,
+    b: Point,
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct BufNode {
+    p: *mut u8,
+    n: usize,
+    next: *mut BufNode,
+}
+
+impl BufNode {
+    unsafe fn from(p: *mut u8, n: usize, next: *mut BufNode) -> *mut Self {
+        let ptr = libc::malloc(mem::size_of::<Self>()) as *mut BufNode;
+        *ptr = BufNode { p, n, next };
+        ptr
+    }
+    unsafe fn empty() -> *mut BufNode {
+        let p = ptr::null_mut::<u8>();
+        let n = 0;
+        let next = ptr::null_mut::<BufNode>();
+        let ptr = libc::malloc(mem::size_of::<Self>()) as *mut BufNode;
+        *ptr = BufNode { p, n, next};
+        ptr
+    }
+}
+
+unsafe fn blobs_into_bufnode(blobs: &mut Vec<Vec<u8>>) -> *mut BufNode {
+    let mut prev: *mut BufNode = std::ptr::null_mut::<BufNode>();
+    let mut bf = BufNode::empty();
+    for blob in blobs.iter().rev() {
+        let n = blob.len();
+        let p = libc::malloc(n) as *mut u8;
+        for (i, byte) in blob.iter().enumerate() {
+            *(p.wrapping_add(i)) = *byte;
+        }
+        let next = prev;
+        bf = BufNode::from(p, n, next);
+        prev = bf;
+    }
+    blobs.truncate(0);
+    bf
+}
+
+#[no_mangle]
+pub extern "C" fn fetch_sample_blob() -> *mut BufNode {
+    let mut sample: Vec<Vec<u8>> = vec![
+        vec![1, 2, 3, 4, 5],
+        vec![2, 3, 5, 7, 11, 13],
+        vec![0, 27, 6],
+    ];
+    unsafe {
+        blobs_into_bufnode(&mut sample)
+    }
 }
 
 /// Instantiate a new Elucidator session. Individual sessions will have
-/// different designation to specification relationships.
+/// different designation to specification relationships. You must check the
+/// return status. If the status is not ELUCIDATOR_OK, an error has occurred
+/// and the value of the passed pointer has not been updated.
 #[no_mangle]
-pub extern "C" fn new_session(sh: &mut *mut SessionHandle, _kind: DatabaseKind) -> ElucidatorStatus {
+pub extern "C" fn new_session(sh: *mut SessionHandle, _kind: DatabaseKind) -> ElucidatorStatus {
     let rdb = match RTreeDatabase::new(None, None) {
         Ok(o) => o,
         Err(_) => {
-            *sh = ptr::null_mut::<SessionHandle>().to_owned();
             return ElucidatorStatus::err();
         }
     };
-    let mut hdl = SessionHandle::get_new();
+    let hdl = SessionHandle::get_new();
     SESSION_MAP.write().unwrap()
         .insert(hdl.clone(), rdb);
-    *sh = &mut hdl;
+    unsafe {
+        *sh = hdl;
+    }
     ElucidatorStatus::ok()
 }
 
@@ -184,7 +246,8 @@ pub extern "C" fn print_session(sh: *const SessionHandle) {
         let map = SESSION_MAP.read().unwrap();
         assert_eq!(1 as u32, 1 as u32);
         assert_eq!(SessionHandle { hdl: 1 }, SessionHandle { hdl: 1});
-        assert_eq!(*sh, SessionHandle { hdl: 1 });
+        let oops = SessionHandle { hdl: 1 };
+        assert_eq!((*sh).id(), SessionHandle { hdl: 1 }.id());
         let ses = map.get(&(*sh));
         println!("{ses:#?}");
     }
