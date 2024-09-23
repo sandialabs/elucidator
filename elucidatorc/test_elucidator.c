@@ -8,37 +8,33 @@
         printf("Made it to line %d\n", __LINE__); \
     } while (0)
 
-int main() {
-    DesignationHandle * dh = ALLOCATE_HANDLE();
+void wrap_insertion(SessionHandle sh, const char * designation, const char * spec) {
     ErrorHandle * eh = ALLOCATE_HANDLE();
-    SessionHandle * sh = ALLOCATE_HANDLE();
-    char * err_string = NULL;
-    int err = get_designation_from_text("bar: u32", dh, eh);
-    if ( err ) {
-        printf("%s\n", get_error_string(eh));
+    ElucidatorStatus status = add_spec_to_session(designation, spec, &sh, eh);
+    if ( status != ELUCIDATOR_OK ) {
+        char * msg = get_error_string(eh);
+        fprintf(stderr, "Encountered error while inserting %s\n", designation);
+        fprintf(stderr, "%s\n", msg);
+        free(msg);
     }
     else {
-        print_designation(dh);
+        printf("Successfully inserted %s\n", designation);
     }
-    err = get_designation_from_text("invalid", dh, eh);
-    if ( err ) {
-        err_string = get_error_string(eh);
-        printf("%s\n", err_string);
-    }
-    else {
-        print_designation(dh);
-    }
-    new_session(sh);
-    err = add_spec_to_session("animal", "name: string", sh, eh);
-    if ( err ) {
-        err_string = get_error_string(eh);
-        printf("%s\n", err_string);
-    }
-    else {
-        print_session(sh);
-    }
-    free(dh);
     free(eh);
-    free(sh);
-    free(err_string);
+}
+
+int main() {
+    SessionHandle * sh = ALLOCATE_HANDLE();
+    ElucidatorStatus status;
+    status = new_session(&sh, ELUCIDATOR_RTREE);
+    if ( status != ELUCIDATOR_OK ) {
+        fprintf(stderr, "Whoops\n");
+        exit(1);
+    }
+    /* This should succeed */
+    wrap_insertion(*sh, "foo", "bar: u32");
+    /* This should fail */
+    wrap_insertion(*sh, "baz", "invalid");
+    print_the_mayhem();
+    print_session(sh);
 }

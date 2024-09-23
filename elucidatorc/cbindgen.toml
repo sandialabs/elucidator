@@ -3,4 +3,56 @@ language = "C"
 line_length = 80
 cpp_compat = true
 tab_width = 4
+header = """
+/* 
+ * Elucidator C API
+ * 
+ * Basic Overview
+ * --------------
+ * 
+ * The C API contains a variety of functions for inserting data into a
+ * management back-end (currently configured to be sqlite). Most functions
+ * rely heavily on the use of Handles, which are structs that hold a 32-bit
+ * unsigned integer. Each handle type is named to ensure that your compiler
+ * can enforce the correct type usage and avoid errors, however they all
+ * behave similarly and are generated from the same module-level variable.
+ * In order to facilitate type and memory safety, all state is tracked on
+ * the rust side of the API. Each handle acts as a sort of pseudo-pointer
+ * to these private variables.
+ * 
+ * Note that all functions are fallible. All handles are tracked in
+ * module-level hashmaps guarded with a read/write lock. If a writing
+ * function panics while holding the write lock, then it will poison
+ * the guarded hashmap, causing every subsequent access to panic. This is
+ * expected to be an extremely rare occurrence. Typically, this
+ * fallibility can be ignored. In the case of functions which may fail due
+ * to logic rather than insertion errors, use the ElucidatorStatus enum to
+ * determine whether the function succeded or failed.
+ * 
+ * For functions which accept pointers, you must allocate the pointer on
+ * the heap. The ALLOCATE_HANDLE() macro is provided for your convenience,
+ * thinly wrapping an unchecked malloc() call. You are responsible for
+ * freeing these pointers. For functions which return char * pointers,
+ * you are also responsible for freeing those pointers.
+ * 
+ * # Typical Usage
+ * 
+ * Typically, you will have one session per program. You can create a
+ * session and get a handle to it using new_session(). Example:
+ *     SessionHandle sh = new_session();
+ * With a session handle, you can register designations to specifications.
+ * This is done most straightforwardly with add_spec_to_session(). Example:
+ *     ErrorHandle *eh = ALLOCATE_HANDLE();
+ *     ElucidatorStatus status = add_spec_to_session(
+ *         "foo",
+ *         "bar: u32",
+ *          sh,
+ *          eh
+ *     );
+ *     if (status != ELUCIDATOR_OK) {
+ *         // Handle Error
+ *     }
+ *     free(eh);
+*/
+"""
 after_includes = "#define ALLOCATE_HANDLE() malloc(4)"

@@ -4,6 +4,7 @@ use rstar::{RTree, RTreeObject, AABB};
 use std::collections::HashMap;
 use elucidator::designation::DesignationSpecification;
 
+#[derive(Debug)]
 pub struct RTreeDatabase {
     /// R*-Tree used internally
     rtree: RTree<MetadataClone>,

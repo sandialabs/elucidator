@@ -8,3 +8,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 elucidator = { version = "0.1.0", path = "../elucidator" }
+elucidator-db = { version = "0.1.0", path = "../elucidator-db" }

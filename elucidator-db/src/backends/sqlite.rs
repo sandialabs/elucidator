@@ -15,8 +15,6 @@ use serde_json;
 use std::fs::File;
 use std::io::Write;
 
-
-
 pub struct SqlDatabase {
     /// Active database connection
     conn: Connection,

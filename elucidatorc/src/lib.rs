@@ -3,11 +3,17 @@ use elucidator::{
     error::ElucidatorError,
 };
 
+use elucidator_db::{
+    error,
+    backends::{sqlite::SqlDatabase, rtree::RTreeDatabase},
+    database::Database,
+};
+
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
     ffi::{CStr, CString},
-    os::raw::{c_char, c_int},
+    os::raw::c_char,
     ptr,
     sync::{
         atomic::{AtomicU32, Ordering},
@@ -15,25 +21,26 @@ use std::{
     },
 };
 
-type Dmap = LazyLock<RwLock<HashMap<DesignationHandle, DesignationSpecification>>>;
-static DESIGNATION_MAP: Dmap = LazyLock::new(|| {
-    RwLock::new(HashMap::new())
-});
-
 type Emap = LazyLock<RwLock<HashMap<ErrorHandle, ElucidatorError>>>;
 static ERROR_MAP: Emap = LazyLock::new(|| {
     RwLock::new(HashMap::new())
 });
 
-type DesignationMap = HashMap<String, DesignationSpecification>;
-type Smap = LazyLock<RwLock<HashMap<SessionHandle, DesignationMap>>>;
+type Smap = LazyLock<RwLock<HashMap<SessionHandle, RTreeDatabase>>>;
 static SESSION_MAP: Smap = LazyLock::new(|| {
     RwLock::new(HashMap::new())
 });
 
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+#[allow(non_camel_case_types)]
+pub enum DatabaseKind {
+    ELUCIDATOR_RTREE,
+}
+
 static HANDLE_NUM: AtomicU32 = AtomicU32::new(1);
 
-pub trait Handle: Hash + Eq { 
+pub trait Handle: Hash { 
     fn get_new() -> Self;
     fn id(&self) -> u32;
 }
@@ -41,13 +48,12 @@ pub trait Handle: Hash + Eq {
 macro_rules! impl_handle {
     ($($tt:ty), *) => {
         $(
-            impl Hash for $tt {
-                fn hash<H>(&self, state: &mut H)
-                    where H: Hasher
-                {
-                    self.hdl.hash(state);
+            impl PartialEq for $tt {
+                fn eq(&self, other: &Self) -> bool {
+                    self.hdl == other.hdl
                 }
             }
+            impl Eq for $tt {}
             impl Handle for $tt {
                 fn get_new() -> Self {
                     let hdl = HANDLE_NUM.fetch_add(1, Ordering::SeqCst);
@@ -60,15 +66,7 @@ macro_rules! impl_handle {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DesignationHandle {
-    hdl: u32
-}
-
-impl_handle!(DesignationHandle);
-
-#[repr(C)]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash)]
 pub struct ErrorHandle {
     hdl: u32
 }
@@ -76,40 +74,55 @@ pub struct ErrorHandle {
 impl_handle!(ErrorHandle);
 
 #[repr(C)]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash)]
 pub struct SessionHandle {
     hdl: u32
 }
 
 impl_handle!(SessionHandle);
 
-/// Create a designation from a given name and specification. On success, the function will return
-/// 0 and place a valid handle into the pointer provided for dh. On failure, an error handle will
-///   be placed into the pointer provided for eh and exit will be nonzero.
+#[repr(C)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(non_camel_case_types)]
+pub enum ElucidatorStatus {
+    ELUCIDATOR_OK,
+    ELUCIDATOR_ERROR,
+}
+
+impl ElucidatorStatus {
+    pub fn ok() -> Self { Self::ELUCIDATOR_OK }
+    pub fn err() -> Self { Self::ELUCIDATOR_ERROR }
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct BoundingBox {
+    xmin: f64,
+    xmax: f64,
+    ymin: f64,
+    ymax: f64,
+    zmin: f64,
+    zmax: f64,
+    tmin: f64,
+    tmax: f64,
+}
+
+/// Instantiate a new Elucidator session. Individual sessions will have
+/// different designation to specification relationships.
 #[no_mangle]
-pub extern "C" fn get_designation_from_text(
-    spec: *const c_char,
-    dh: *mut DesignationHandle,
-    eh: *mut ErrorHandle,
-) -> c_int {
-    let spec = String::from_utf8_lossy(
-        unsafe { CStr::from_ptr(spec) }.to_bytes()
-    );
-    let designation = match DesignationSpecification::from_text(&spec) {
+pub extern "C" fn new_session(sh: &mut *mut SessionHandle, _kind: DatabaseKind) -> ElucidatorStatus {
+    let rdb = match RTreeDatabase::new(None, None) {
         Ok(o) => o,
-        Err(e) => {
-            unsafe {
-                *eh = ErrorHandle::get_new();
-                ERROR_MAP.write().unwrap().insert((*eh).clone(), e);
-            }
-            return 1;
-        },
+        Err(_) => {
+            *sh = ptr::null_mut::<SessionHandle>().to_owned();
+            return ElucidatorStatus::err();
+        }
     };
-    unsafe {
-        *dh = DesignationHandle::get_new();
-        DESIGNATION_MAP.write().unwrap().insert((*dh).clone(), designation);
-    }
-    0
+    let mut hdl = SessionHandle::get_new();
+    SESSION_MAP.write().unwrap()
+        .insert(hdl.clone(), rdb);
+    *sh = &mut hdl;
+    ElucidatorStatus::ok()
 }
 
 /// Get a string based on the provided handle. If the handle cannot be foundor is NULL, the
@@ -126,30 +139,18 @@ pub extern "C" fn get_error_string(eh: *const ErrorHandle) -> *mut c_char {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn print_designation(handle: *const DesignationHandle) {
-    let map = DESIGNATION_MAP.read().unwrap();
-    unsafe {
-        let spec = map.get(&(*handle));
-        println!("{spec:#?}");
-    };
-}
-
-#[no_mangle]
-pub extern "C" fn new_session(sh: *mut SessionHandle) {
-    unsafe {
-        *sh = SessionHandle::get_new();
-        SESSION_MAP.write().unwrap().insert((*sh).clone(), HashMap::new());
-    }
-}
-
+/// Register the given name and specification to a given session handle.
+/// On failure, an error handle will be placed into the provided pointer.
+/// Runtime should be O(1) unless the insertion causes a re-hash of a
+/// module-level HashMap, which will take O(n) with n the number of
+/// designations.
 #[no_mangle]
 pub extern "C" fn add_spec_to_session(
     name: *const c_char,
     spec: *const c_char,
-    session: *const SessionHandle,
+    sh: *const SessionHandle,
     eh: *mut ErrorHandle,
-) -> c_int {
+) -> ElucidatorStatus {
     let name = String::from_utf8_lossy(
         unsafe { CStr::from_ptr(name) }.to_bytes()
     );
@@ -163,23 +164,38 @@ pub extern "C" fn add_spec_to_session(
                 *eh = ErrorHandle::get_new();
                 ERROR_MAP.write().unwrap().insert((*eh).clone(), e);
             }
-            return 1;
+            return ElucidatorStatus::err();
         },
     };
     unsafe {
-        SESSION_MAP.write().unwrap()
-            .get_mut(&*session)
-            .unwrap()
-            .insert(name.to_string(), designation);
+        let mut map = SESSION_MAP.write().unwrap();
+        let mut session = map.get_mut(&(*sh).clone()).unwrap();
+        match &mut session.insert_spec_text(&name, &spec) {
+            Ok(_) => ElucidatorStatus::ok(),
+            Err(_) => ElucidatorStatus::err(),
+        }
     }
-    0
 }
 
+/// Print a session map
 #[no_mangle]
 pub extern "C" fn print_session(sh: *const SessionHandle) {
-    let sm = SESSION_MAP.read().unwrap();
     unsafe {
-        let map = sm.get(&*sh).unwrap();
-        println!("{map:#?}");
-    };
+        let map = SESSION_MAP.read().unwrap();
+        assert_eq!(1 as u32, 1 as u32);
+        assert_eq!(SessionHandle { hdl: 1 }, SessionHandle { hdl: 1});
+        assert_eq!(*sh, SessionHandle { hdl: 1 });
+        let ses = map.get(&(*sh));
+        println!("{ses:#?}");
+    }
+
+    unsafe {
+        println!("Got {:#?}", *sh);
+    }
+}
+
+/// Print it all
+#[no_mangle]
+pub extern "C" fn print_the_mayhem() {
+    println!("{:#?}", SESSION_MAP.read().unwrap());
 }
