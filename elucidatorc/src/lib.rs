@@ -15,6 +15,7 @@ use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
     ffi::{CStr, CString},
+    fmt,
     mem,
     os::raw::c_char,
     ptr,
@@ -24,7 +25,7 @@ use std::{
     },
 };
 
-type Emap = LazyLock<RwLock<HashMap<ErrorHandle, ElucidatorError>>>;
+type Emap = LazyLock<RwLock<HashMap<ErrorHandle, ApiError>>>;
 static ERROR_MAP: Emap = LazyLock::new(|| {
     RwLock::new(HashMap::new())
 });
@@ -46,6 +47,7 @@ static HANDLE_NUM: AtomicU32 = AtomicU32::new(1);
 pub trait Handle: Hash { 
     fn get_new() -> Self;
     fn id(&self) -> u32;
+    fn htype() -> String;
 }
 
 macro_rules! impl_handle {
@@ -63,6 +65,9 @@ macro_rules! impl_handle {
                     Self { hdl: hdl.clone() }
                 }
                 fn id(&self) -> u32 { self.hdl }
+                fn htype() -> String {
+                    stringify!($tt).to_string()
+                }
             }
         )*
     };
@@ -81,6 +86,55 @@ impl_handle!(ErrorHandle);
 pub struct SessionHandle {
     hdl: u32
 }
+
+#[derive(Debug)]
+enum ApiError {
+    Eluci(ElucidatorError),
+    Database(error::DatabaseError),
+    HandleNotFound{address: String, id: u32, handle_type: String},
+    DesignationNotFound{session: u32, designation: String},
+}
+
+impl fmt::Display for ApiError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Eluci(e) => {
+                write!(f, "ElucidatorError: {e}")
+            },
+            Self::Database(e) => {
+                write!(f, "Elucidator Database Error: {e}")
+            },
+            Self::HandleNotFound{address, id, handle_type} => {
+                write!(f, "Handle {id} not found: type {handle_type} at address {address}")
+            },
+            Self::DesignationNotFound{session, designation} => {
+                write!(f, "Cannot find designation {designation} in session {session}")
+            },
+        }
+    }
+}
+
+impl From<ElucidatorError> for ApiError {
+    fn from(error: ElucidatorError) -> Self {
+        Self::Eluci(error)
+    }
+}
+
+impl From<error::DatabaseError> for ApiError {
+    fn from(error: error::DatabaseError) -> Self {
+        Self::Database(error)
+    }
+}
+
+fn not_found_from<T: Handle>(hdl: &T) -> ApiError {
+    ApiError::HandleNotFound {
+        address: unsafe { format!("{:#?}", ptr::addr_of!(hdl)) },
+        id: hdl.id(),
+        handle_type: T::htype(),
+    }
+}
+
+
 
 impl_handle!(SessionHandle);
 
@@ -137,7 +191,7 @@ impl BufNode {
     }
 }
 
-unsafe fn blobs_into_bufnode(blobs: &mut Vec<Vec<u8>>) -> *mut BufNode {
+unsafe fn blobs_into_bufnode(blobs: &mut Vec<&Vec<u8>>) -> *mut BufNode {
     let mut prev: *mut BufNode = std::ptr::null_mut::<BufNode>();
     let mut bf = BufNode::empty();
     for blob in blobs.iter().rev() {
@@ -154,13 +208,23 @@ unsafe fn blobs_into_bufnode(blobs: &mut Vec<Vec<u8>>) -> *mut BufNode {
     bf
 }
 
+unsafe fn free_bufnodes(bf: *mut BufNode) {
+    let mut current = bf;
+    while !current.is_null() {
+        let next = (*current).next;
+        libc::free((*current).p as *mut libc::c_void);
+        libc::free(current as *mut libc::c_void);
+        current = next;
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn fetch_sample_blob() -> *mut BufNode {
-    let mut sample: Vec<Vec<u8>> = vec![
-        vec![1, 2, 3, 4, 5],
-        vec![2, 3, 5, 7, 11, 13],
-        vec![0, 27, 6],
-    ];
+    let a = vec![1, 2, 3, 4, 5];
+    let b = vec![2, 3, 5, 7, 11, 13];
+    let c = vec![0, 27, 6];
+
+    let mut sample: Vec<&Vec<u8>> = vec![&a, &b, &c];
     unsafe {
         blobs_into_bufnode(&mut sample)
     }
@@ -224,7 +288,7 @@ pub extern "C" fn add_spec_to_session(
         Err(e) => {
             unsafe {
                 *eh = ErrorHandle::get_new();
-                ERROR_MAP.write().unwrap().insert((*eh).clone(), e);
+                ERROR_MAP.write().unwrap().insert((*eh).clone(), e.into());
             }
             return ElucidatorStatus::err();
         },
@@ -232,11 +296,70 @@ pub extern "C" fn add_spec_to_session(
     unsafe {
         let mut map = SESSION_MAP.write().unwrap();
         let mut session = map.get_mut(&(*sh).clone()).unwrap();
+        let hdl = unsafe { (*sh).clone() };
+        let mut session = match map.get_mut(&hdl) {
+            Some(ses) => ses,
+            None => {
+                let ehdl = ErrorHandle::get_new();
+                unsafe {
+                    *eh = ehdl.clone();
+                }
+                ERROR_MAP.write().unwrap()
+                    .insert(
+                        ehdl.clone(),
+                        not_found_from(&hdl)
+                    );
+                return ElucidatorStatus::err();
+            }
+        };
         match &mut session.insert_spec_text(&name, &spec) {
             Ok(_) => ElucidatorStatus::ok(),
-            Err(_) => ElucidatorStatus::err(),
+            Err(e) => {
+                let ehdl = ErrorHandle::get_new();
+                unsafe {
+                    *eh = ehdl.clone();
+                }
+                ERROR_MAP.write().unwrap()
+                    .insert(ehdl.clone(), (*e).clone().into());
+                ElucidatorStatus::err()
+            },
         }
     }
+}
+
+/// Insert metadata into a session.
+#[no_mangle]
+pub extern "C" fn insert_metadata_in_session(
+    sh: *const SessionHandle,
+    bb: BoundingBox,
+    designation: *const c_char,
+    blob: *const u8,
+    n_bytes: usize,
+    eh: *mut ErrorHandle,
+) -> ElucidatorStatus {
+    let designation = String::from_utf8_lossy(
+        unsafe { CStr::from_ptr(designation) }.to_bytes()
+    );
+    let mut map = SESSION_MAP.write().unwrap();
+    let hdl = unsafe { (*sh).clone() };
+    let mut session = match map.get_mut(&hdl) {
+        Some(ses) => ses,
+        None => {
+            let ehdl = ErrorHandle::get_new();
+            unsafe {
+                *eh = ehdl.clone();
+            }
+            ERROR_MAP.write().unwrap()
+                .insert(
+                    ehdl.clone(),
+                    not_found_from(&hdl)
+                );
+            return ElucidatorStatus::err();
+        }
+    };
+    let buffer = todo!();
+    session.insert_metadata();
+    todo!("Finish implementing.");
 }
 
 /// Print a session map
