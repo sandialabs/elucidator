@@ -1,10 +1,10 @@
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DatabaseError {
     /// Errors related to creating databases.
     RusqliteError{
-        reason: rusqlite::Error,
+        reason: String,
     },
     ElucidatorError{
         reason: elucidator::error::ElucidatorError,
@@ -45,7 +45,7 @@ impl fmt::Display for DatabaseError {
 
 impl From<rusqlite::Error> for DatabaseError {
     fn from(error: rusqlite::Error) -> Self {
-        DatabaseError::RusqliteError { reason: error }
+        DatabaseError::RusqliteError { reason: format!("{error}") }
     }
 }
 
