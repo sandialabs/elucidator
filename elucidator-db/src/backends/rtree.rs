@@ -1,7 +1,7 @@
 use crate::database::{Datum, Metadata, Database, Result, DatabaseConfig};
 use rstar::{RTree, RTreeObject, AABB};
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 use elucidator::designation::DesignationSpecification;
 
 #[derive(Debug)]
@@ -125,16 +125,33 @@ impl Database for RTreeDatabase {
         designation: &str,
         epsilon: Option<f64>,
     ) -> Result<Vec<Datum>> {
+        let d = self.designations.get(designation).unwrap();
+        let blobs = self.get_metadata_blobs_in_bb(xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax, designation, epsilon)?;
+        Ok(blobs.iter()
+            .map(|b| d.interpret_enum(b).unwrap())
+            .collect()
+        )
+
+    }
+
+    fn get_metadata_blobs_in_bb(
+        &self,
+        xmin: f64, xmax: f64,
+        ymin: f64, ymax: f64,
+        zmin: f64, zmax: f64,
+        tmin: f64, tmax: f64,
+        designation: &str,
+        epsilon: Option<f64>,
+    ) -> Result<Vec<&Vec<u8>>> {
         let eps = epsilon.unwrap_or(0.0);
         let mins = [xmin - eps, ymin - eps, zmin - eps, tmin - eps];
         let maxs = [xmax + eps, ymax + eps, zmax + eps, tmax + eps];
         
         let bb = AABB::from_corners(mins, maxs);
-        let d = self.designations.get(designation).unwrap();
         Ok(
             self.rtree.locate_in_envelope(&bb)
                 .filter(|m| m.designation == designation)
-                .map(|m| d.interpret_enum(&m.buffer).unwrap())
+                .map(|m| &m.buffer)
                 .collect()
         )
     }
