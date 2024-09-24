@@ -39,6 +39,7 @@ void print_buf(BufNode * b) {
 
 int main() {
     SessionHandle * sh = ALLOCATE_HANDLE();
+    ErrorHandle * eh = ALLOCATE_HANDLE();
     ElucidatorStatus status;
     status = new_session(sh, ELUCIDATOR_RTREE);
     if ( status != ELUCIDATOR_OK ) {
@@ -49,7 +50,23 @@ int main() {
     wrap_insertion(sh, "foo", "bar: u32");
     /* This should fail */
     wrap_insertion(sh, "baz", "invalid");
+    wrap_insertion(sh, "stuff", "mystuff: u8[5]");
     print_session(sh);
     BufNode * b = fetch_sample_blob();
     print_buf(b);
+    int n_bytes = 5;
+    char arr[5] = {0, 1, 1, 2, 3};
+    BoundingBox bb = {
+        -1.0, 0.0,
+        1.0, 2.0,
+        2.72, 3.14,
+        0.0, 1000.0
+    };
+    status = insert_metadata_in_session(sh, bb, "stuff", &arr[0], 5, eh);
+    if ( status != ELUCIDATOR_OK ) {
+        char * msg = get_error_string(eh);
+        fprintf(stderr, "%s\n", msg);
+        free(msg);
+    }
+    print_the_mayhem();
 }

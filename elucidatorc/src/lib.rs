@@ -6,7 +6,7 @@ use elucidator::{
 use elucidator_db::{
     error,
     backends::{sqlite::SqlDatabase, rtree::RTreeDatabase},
-    database::Database,
+    database::{Database, Metadata},
 };
 
 use libc;
@@ -19,6 +19,7 @@ use std::{
     mem,
     os::raw::c_char,
     ptr,
+    slice,
     sync::{
         atomic::{AtomicU32, Ordering},
         LazyLock, RwLock
@@ -357,9 +358,34 @@ pub extern "C" fn insert_metadata_in_session(
             return ElucidatorStatus::err();
         }
     };
-    let buffer = todo!();
-    session.insert_metadata();
-    todo!("Finish implementing.");
+    let buffer = unsafe { slice::from_raw_parts(blob, n_bytes) };
+    let datum = Metadata {
+        xmin: bb.a.x,
+        xmax: bb.b.x,
+        ymin: bb.a.y,
+        ymax: bb.b.y,
+        zmin: bb.a.z,
+        zmax: bb.b.z,
+        tmin: bb.a.t,
+        tmax: bb.b.t,
+        designation: &designation,
+        buffer,
+    };
+    match session.insert_metadata(&datum) {
+        Ok(_) => ElucidatorStatus::ok(),
+        Err(e) => {
+            let ehdl = ErrorHandle::get_new();
+            unsafe {
+                *eh = ehdl.clone();
+            }
+            ERROR_MAP.write().unwrap()
+                .insert(
+                    ehdl.clone(),
+                    ApiError::Database(e.clone()),
+                );
+            ElucidatorStatus::err()
+        },
+    }
 }
 
 /// Print a session map
