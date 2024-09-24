@@ -55,7 +55,7 @@ int main() {
     BufNode * b = fetch_sample_blob();
     print_buf(b);
     int n_bytes = 5;
-    char arr[5] = {0, 1, 1, 2, 3};
+    uint8_t arr[5] = {0, 1, 1, 2, 3};
     BoundingBox bb = {
         -1.0, 0.0,
         1.0, 2.0,
@@ -68,5 +68,18 @@ int main() {
         fprintf(stderr, "%s\n", msg);
         free(msg);
     }
+    BufNode sample;
+    BufNode ** bn = (BufNode **)malloc(sizeof sample);
+    // Reduce the value to 0.0 and it fails despite the bbs being identical
+    status = get_metadata_in_bb(sh, bb, "stuff", 1.0, bn, eh);
+    if ( status != ELUCIDATOR_OK ) {
+        char * msg = get_error_string(eh);
+        fprintf(stderr, "%s\n", msg);
+        free(msg);
+    }
+    printf("Found metadata:\n");
+    print_buf(*bn);
+    free_bufnodes(*bn);
+    printf("Printing the full session debug info\n");
     print_the_mayhem();
 }

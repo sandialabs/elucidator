@@ -209,13 +209,16 @@ unsafe fn blobs_into_bufnode(blobs: &mut Vec<&Vec<u8>>) -> *mut BufNode {
     bf
 }
 
-unsafe fn free_bufnodes(bf: *mut BufNode) {
-    let mut current = bf;
-    while !current.is_null() {
-        let next = (*current).next;
-        libc::free((*current).p as *mut libc::c_void);
-        libc::free(current as *mut libc::c_void);
-        current = next;
+#[no_mangle]
+pub extern "C" fn free_bufnodes(bf: *mut BufNode) {
+    unsafe {
+        let mut current = bf;
+        while !current.is_null() {
+            let next = (*current).next;
+            libc::free((*current).p as *mut libc::c_void);
+            libc::free(current as *mut libc::c_void);
+            current = next;
+        }
     }
 }
 
@@ -373,6 +376,71 @@ pub extern "C" fn insert_metadata_in_session(
     };
     match session.insert_metadata(&datum) {
         Ok(_) => ElucidatorStatus::ok(),
+        Err(e) => {
+            let ehdl = ErrorHandle::get_new();
+            unsafe {
+                *eh = ehdl.clone();
+            }
+            ERROR_MAP.write().unwrap()
+                .insert(
+                    ehdl.clone(),
+                    ApiError::Database(e.clone()),
+                );
+            ElucidatorStatus::err()
+        },
+    }
+}
+
+/// Get metadata overlapping a point
+#[no_mangle]
+pub extern "C" fn get_metadata_in_bb(
+    sh: *const SessionHandle,
+    bb: BoundingBox,
+    designation: *const c_char,
+    epsilon: f64,
+    results: *mut *mut BufNode,
+    eh: *mut ErrorHandle,
+) -> ElucidatorStatus {
+    let designation = String::from_utf8_lossy(
+        unsafe { CStr::from_ptr(designation) }.to_bytes()
+    );
+    let mut map = SESSION_MAP.write().unwrap();
+    let hdl = unsafe { (*sh).clone() };
+    let mut session = match map.get_mut(&hdl) {
+        Some(ses) => ses,
+        None => {
+            let ehdl = ErrorHandle::get_new();
+            unsafe {
+                *eh = ehdl.clone();
+            }
+            ERROR_MAP.write().unwrap()
+                .insert(
+                    ehdl.clone(),
+                    not_found_from(&hdl)
+                );
+            return ElucidatorStatus::err();
+        }
+    };
+    let mut r = session.get_metadata_blobs_in_bb(
+        bb.a.x,
+        bb.b.x,
+        bb.a.y,
+        bb.b.y,
+        bb.a.z,
+        bb.b.z,
+        bb.a.t,
+        bb.b.t,
+        &designation,
+        Some(epsilon),
+    );
+    match &mut r {
+        Ok(o) => {
+            unsafe {
+                let mut bn = blobs_into_bufnode(o);
+                *results = bn;
+            }
+            ElucidatorStatus::ok()
+        },
         Err(e) => {
             let ehdl = ErrorHandle::get_new();
             unsafe {
