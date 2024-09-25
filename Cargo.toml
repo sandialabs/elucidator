@@ -4,7 +4,9 @@ members = [
     "elucidator",
     "elucidator-db",
     "elucitools",
-    "elucidator_macros", "elucidatorc",
+    "elucidator_macros",
+    "elucidatorc",
+    "pyelucidator",
 ]
 resolver = "2"
 
