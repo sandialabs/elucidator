@@ -52,16 +52,13 @@ int main() {
     wrap_insertion(sh, "baz", "invalid");
     wrap_insertion(sh, "stuff", "mystuff: u8[5]");
     print_session(sh);
-    BufNode * b = fetch_sample_blob();
-    print_buf(b);
+    BufNode * blob = fetch_sample_blob();
+    print_buf(blob);
     int n_bytes = 5;
     uint8_t arr[5] = {0, 1, 1, 2, 3};
-    BoundingBox bb = {
-        -1.0, 0.0,
-        1.0, 2.0,
-        2.72, 3.14,
-        0.0, 1000.0
-    };
+    Point a = { -1.0, 1.0, 2.72, 0.0 };
+    Point b = { 0.0, 2.0, 3.14, 1000.0 };
+    BoundingBox bb = { a, b };
     status = insert_metadata_in_session(sh, bb, "stuff", &arr[0], 5, eh);
     if ( status != ELUCIDATOR_OK ) {
         char * msg = get_error_string(eh);
@@ -70,8 +67,7 @@ int main() {
     }
     BufNode sample;
     BufNode ** bn = (BufNode **)malloc(sizeof sample);
-    // Reduce the value to 0.0 and it fails despite the bbs being identical
-    status = get_metadata_in_bb(sh, bb, "stuff", 1.0, bn, eh);
+    status = get_metadata_in_bb(sh, bb, "stuff", 0.0, bn, eh);
     if ( status != ELUCIDATOR_OK ) {
         char * msg = get_error_string(eh);
         fprintf(stderr, "%s\n", msg);
