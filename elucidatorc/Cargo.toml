@@ -1,0 +1,12 @@
+[package]
+name = "elucidatorc"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+elucidator = { version = "0.1.0", path = "../elucidator" }
+elucidator-db = { version = "0.1.0", path = "../elucidator-db" }
+libc = "0.2.158"

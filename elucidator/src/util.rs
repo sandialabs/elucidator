@@ -29,23 +29,9 @@ impl<'a> Buffer<'a> {
             Ok(self.slice[curr_pos..(curr_pos + n)].to_vec())
         }
     }
-    /// Skip n elements in the slice
-    pub(crate) fn skip(&mut self, n: usize) -> Result<()> {
-        if self.position + n > self.slice.len() {
-            let curr_pos = self.position;
-            // Advance to end so that all future calls fail
-            self.position = self.slice.len();
-            Err(ElucidatorError::BufferSizing{
-                expected: n,
-                found: (self.slice.len() - curr_pos)
-            })
-        } else {
-            self.position += n;
-            Ok(())
-        }
-    }
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
 

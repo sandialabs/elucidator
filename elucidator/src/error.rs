@@ -1,4 +1,4 @@
-use std::{fmt, string::FromUtf8Error};
+use std::{fmt, collections::HashSet, string::FromUtf8Error};
 use crate::token::TokenClone;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -116,9 +116,11 @@ impl InternalError {
         }
     }
     pub fn merge(errs: &[InternalError]) -> InternalError {
-        let errors: Vec<InternalError> = errs.iter()
+        let mut entries: HashSet<String> = HashSet::new();
+        let mut errors: Vec<InternalError> = errs.iter()
             .flat_map(InternalError::expand)
             .collect();
+        errors.retain(|x| entries.insert(format!("{x}")));
         if errors.len() == 1 {
             errors[0].clone()
         } else {

@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::io::{Cursor, Read};
 
 use crate::{
     error::*,
@@ -10,8 +9,6 @@ use crate::{
     value::{DataValue, LeBufferRead},
     representable::Representable,
 };
-
-use elucidator_macros::make_dtype_interpreter;
 
 type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
 
@@ -363,7 +360,7 @@ impl DesignationSpecification {
         let mut map = HashMap::new();
         let mut buf = Buffer::new(buffer);
         for member in &self.members {
-            let member_name = member.identifier.as_str().clone();
+            let member_name = member.identifier.as_str();
             let value = match member.sizing {
                 Sizing::Singleton => {
                     get_singleton_from_buf(&mut buf, &member.dtype)? 

@@ -5,6 +5,16 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "validatespec"
+path = "src/validate.rs"
+
+[[bin]]
+name = "sadbench"
+path = "src/sadbench.rs"
+
 [dependencies]
 elucidator = { path = "../elucidator" }
 clap = { version = "4.5.16", features = ["derive"] }
+elucidator-db = { version = "0.1.0", path = "../elucidator-db" }
+rand = "0.8.5"
