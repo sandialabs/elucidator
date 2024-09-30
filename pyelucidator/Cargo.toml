@@ -1,0 +1,14 @@
+[package]
+name = "pyelucidator"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "pyelucidator"
+crate-type = ["cdylib"]
+
+[dependencies]
+elucidator = { version = "0.1.0", path = "../elucidator" }
+elucidator-db = { version = "0.1.0", path = "../elucidator-db" }
+pyo3 = "0.21.1"
