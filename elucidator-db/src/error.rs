@@ -17,6 +17,9 @@ pub enum DatabaseError {
     },
     ConfigError{
         reason: String
+    },
+    LockError{
+        reason: String
     }
 }
 
@@ -37,6 +40,9 @@ impl fmt::Display for DatabaseError {
             },
             Self::ConfigError { reason } => {
                 format!("Config Error: {reason}")
+            },
+            Self::LockError { reason } => {
+                format!("Lock Error: {reason}")
             }
         };
         write!(f, "{m}")
@@ -58,6 +64,13 @@ impl From<elucidator::error::ElucidatorError> for DatabaseError {
 impl From<std::io::Error> for DatabaseError {
     fn from(error: std::io::Error) -> Self {
         DatabaseError::IOError { reason: format!("{error}") }
+    }
+}
+
+
+impl<T> From<std::sync::PoisonError<T>> for DatabaseError {
+    fn from(error: std::sync::PoisonError<T>) -> Self {
+        DatabaseError::LockError { reason: format!("{error}") }
     }
 }
 

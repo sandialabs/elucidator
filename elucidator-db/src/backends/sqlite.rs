@@ -14,10 +14,11 @@ use serde_json;
 
 use std::fs::File;
 use std::io::Write;
+use std::sync::{Arc, Mutex};
 
 pub struct SqlDatabase {
     /// Active database connection
-    conn: Connection,
+    conn: Arc<Mutex<Connection>>,
     /// Mapping of designations
     designations: HashMap<String, DesignationSpecification>,
     /// Extra configuration settings for the database
@@ -80,46 +81,47 @@ impl SqlDatabase {
     const MIN_VERSION: [u32; 3] = [3, 7, 0];
     fn initialize(&self) -> Result<()> {
         self.verify_version()?;
+        let conn = self.conn.lock()?;
         if self.config.use_wal {
-            self.conn.execute("PRAGMA journal_mode = WAL", [])?;
+            conn.execute("PRAGMA journal_mode = WAL", [])?;
         }
-        self.conn.execute(
+        conn.execute(
             &format!("PRAGMA page_size = {}", self.config.page_size), 
             []
         )?;
         if self.config.synchronous_off {
-            self.conn.execute("PRAGMA synchronous = OFF", [])?;
+            conn.execute("PRAGMA synchronous = OFF", [])?;
         }
         if self.config.use_memory_temp_store {
-            self.conn.execute("PRAGMA temp_store = MEMORY", [])?;
+            conn.execute("PRAGMA temp_store = MEMORY", [])?;
         }
         if self.config.threads > 0 {
-            self.conn.execute(
+            conn.execute(
                 &format!("PRAGMA threads = {}",
                 self.config.threads), []
             )?;
         }
         if self.config.cached_pages > 0 {
-            self.conn.execute(
+            conn.execute(
                 &format!("PRAGMA cache_size = {}",
                 self.config.cached_pages), []
             )?;
         }
-        self.conn.execute(
+        conn.execute(
             "CREATE TABLE designation_spec (
                 designation  TEXT NOT NULL PRIMARY KEY,
                 spec  TEXT NOT NULL
             )",
             (), // empty list of parameters.
         )?;
-        self.conn.execute(
+        conn.execute(
             "CREATE VIRTUAL TABLE MetadataLocations USING rtree(
                 id INTEGER PRIMARY KEY,
                 xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax
             )",
             (), // empty list of parameters.
         )?;
-        self.conn.execute(
+        conn.execute(
             "CREATE TABLE Metadata (
                 id INTEGER PRIMARY KEY,
                 designation TEXT,
@@ -127,11 +129,12 @@ impl SqlDatabase {
             )",
             []
         )?;
-        self.conn.execute("PRAGMA optimize", [])?;
+        conn.execute("PRAGMA optimize", [])?;
         Ok(())
     }
     fn verify_version(&self) -> Result<(), DatabaseError> {
-        let version = self.conn.query_row(
+        let conn = self.conn.lock()?;
+        let version = conn.query_row(
             "SELECT SQLITE_VERSION();", 
             [],
             |row| row.get::<usize, String>(0)
@@ -179,13 +182,13 @@ impl Database for SqlDatabase {
         };
         let db = if let Some(name) = filename {
             SqlDatabase {
-                conn: Connection::open(name)?,
+                conn: Arc::new(Mutex::new(Connection::open(name)?)),
                 designations: HashMap::new(),
                 config,
             }
         } else {
             SqlDatabase {
-                conn: Connection::open_in_memory()?,
+                conn: Arc::new(Mutex::new(Connection::open_in_memory()?)),
                 designations: HashMap::new(),
                 config,
             }
@@ -209,19 +212,21 @@ impl Database for SqlDatabase {
             }
         }
         Ok(SqlDatabase { 
-            conn,
+            conn: Arc::new(Mutex::new(conn)),
             designations,
             config: SqliteConfig::new(),
         })
     }
     fn save_as(&self, filename: &str) -> Result<()> {
-        self.conn.backup(rusqlite::DatabaseName::Main, filename, None)?;
+        let conn = self.conn.lock()?;
+        conn.backup(rusqlite::DatabaseName::Main, filename, None)?;
         Ok(())
     }
 
     fn insert_spec_text(&mut self, designation: &str, spec: &str) -> Result<()> {
         let designation_spec = DesignationSpecification::from_text(spec)?;
-        self.conn.execute(
+        let conn = self.conn.lock()?;
+        conn.execute(
             "INSERT INTO designation_spec (designation, spec) VALUES (?1, ?2)",
             (designation, spec),
         )?;
@@ -229,8 +234,8 @@ impl Database for SqlDatabase {
         Ok(())
     }
     fn insert_metadata(&mut self, datum: &Metadata) -> Result<()> {
-        let tx= self.conn.transaction()?;
-
+        let mut conn = self.conn.lock()?;
+        let tx = conn.transaction()?;
         {
             let mut stmt = tx.prepare_cached(
                 "INSERT INTO MetadataLocations (xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -249,7 +254,8 @@ impl Database for SqlDatabase {
         Ok(())
     }
     fn insert_n_metadata(&mut self, data: &Vec<Metadata>) -> Result<()> {
-        let tx= self.conn.transaction()?;
+        let mut conn = self.conn.lock()?;
+        let tx = conn.transaction()?;
 
         for datum in data {
             let mut stmt = tx.prepare_cached(
@@ -287,7 +293,8 @@ impl Database for SqlDatabase {
         let tmin = tmin - eps;
         let tmax = tmax + eps;
 
-        let mut stmt = self.conn.prepare_cached(
+        let conn = self.conn.lock()?;
+        let mut stmt = conn.prepare_cached(
             "SELECT 
                 ml.id, ml.xmin, ml.xmax, ml.ymin, ml.ymax, ml.zmin, ml.zmax, ml.tmin, ml.tmax,
                 m.designation, m.buffer
