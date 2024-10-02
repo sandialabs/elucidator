@@ -112,10 +112,9 @@ impl Database for RTreeDatabase {
         for (designation, designation_spec) in self.designations.iter() {
             sqlite.insert_spec_text(&designation, &designation_spec.to_string())?;
         }
-        let md_clones: Vec<&MetadataClone> = self.rtree.iter().collect();
-        let mds: Vec<Metadata> = md_clones.iter()
-            .map(|m| 
-                Metadata {
+        let md_results: Result<Vec<()>, crate::error::DatabaseError> = self.rtree.iter()
+            .map(|m| {
+                let md = Metadata {
                     xmin: m.xmin,
                     xmax: m.xmax,
                     ymin: m.ymin,
@@ -126,10 +125,11 @@ impl Database for RTreeDatabase {
                     tmax: m.tmax,
                     designation: &m.designation,
                     buffer: &m.buffer,
-                }
-            )
-            .collect(); 
-        sqlite.insert_n_metadata(&mds)?;
+                };
+                sqlite.insert_metadata(&md)
+            })
+            .collect();
+        md_results?;
         Ok(())
     }
     fn insert_spec_text(&mut self, designation: &str, spec: &str) -> Result<()> {
