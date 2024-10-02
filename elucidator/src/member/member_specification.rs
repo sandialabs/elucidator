@@ -18,8 +18,10 @@ impl MemberSpecification {
             dtype: dtype.clone(),
         }
     }
+}
 
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for MemberSpecification {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let sizing_string = match self.sizing {
             Sizing::Singleton => { format!("") },
             Sizing::Dynamic => { format!("[]") },
@@ -38,6 +40,7 @@ impl MemberSpecification {
             Dtype::Float64 => { format!("f64") },
             Dtype::Str => { format!("string") },
         };
-        format!("{}: {dtype_string}{sizing_string}", self.identifier)
+        let m = format!("{}: {dtype_string}{sizing_string}", self.identifier);
+        write!(f, "{m}")
     }
 }
