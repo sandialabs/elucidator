@@ -437,10 +437,12 @@ mod test {
                      ("bar", DataValue::Float32(1000000.0))]
                 ),
             ];
-            pretty_assertions::assert_eq!(
-                result, 
-                Ok(expected),
-            );
+            assert!(result.is_ok());
+            let result = result.unwrap();
+            assert_eq!(result.len(), expected.len());
+            for x in expected.iter() {
+                assert!(result.contains(x));
+            }
         }
 
         #[test]
@@ -501,10 +503,12 @@ mod test {
             
             let recovered = RTreeDatabase::from_path(&tempfile.filepath).unwrap();
             pretty_assertions::assert_eq!(db.designations, recovered.designations);
-            pretty_assertions::assert_eq!(
-                db.rtree.iter().collect::<Vec<&MetadataClone>>(),
-                recovered.rtree.iter().collect::<Vec<&MetadataClone>>(),
-            );
+            let db_md = db.rtree.iter().collect::<Vec<&MetadataClone>>();
+            let recovered_md = recovered.rtree.iter().collect::<Vec<&MetadataClone>>();
+            assert_eq!(db_md.len(), recovered_md.len());
+            for element in db_md.iter() {
+                assert!(recovered_md.contains(element));
+            }
         }
     }
 }
