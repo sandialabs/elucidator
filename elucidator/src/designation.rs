@@ -377,6 +377,13 @@ impl DesignationSpecification {
         }
         Ok(map)
     }
+
+    pub fn to_string(&self) -> String {
+        self.members.iter()
+            .map(MemberSpecification::to_string)
+            .collect::<Vec<String>>()
+            .join(", ")
+    }
 }
 
 #[cfg(test)]

@@ -55,6 +55,12 @@ impl From<rusqlite::Error> for DatabaseError {
     }
 }
 
+impl From<rusqlite::types::FromSqlError> for DatabaseError {
+    fn from(error: rusqlite::types::FromSqlError) -> Self {
+        DatabaseError::RusqliteError { reason: format!("{error}") } 
+    }
+}
+
 impl From<elucidator::error::ElucidatorError> for DatabaseError {
     fn from(error: elucidator::error::ElucidatorError) -> Self {
         DatabaseError::ElucidatorError { reason: error }
@@ -66,7 +72,6 @@ impl From<std::io::Error> for DatabaseError {
         DatabaseError::IOError { reason: format!("{error}") }
     }
 }
-
 
 impl<T> From<std::sync::PoisonError<T>> for DatabaseError {
     fn from(error: std::sync::PoisonError<T>) -> Self {

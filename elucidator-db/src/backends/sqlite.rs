@@ -6,6 +6,7 @@ use elucidator::designation::DesignationSpecification;
 use crate::{
     database::{Database, DatabaseConfig, Datum, Metadata, Result, Config}, 
     error::DatabaseError,
+    backends::rtree::MetadataClone,
 };
 
 
@@ -160,6 +161,50 @@ impl SqlDatabase {
             }
         }
         Ok(())
+    }
+    pub fn get_designations(&self) -> HashMap<String, DesignationSpecification> {
+        self.designations.clone()
+    }
+    pub fn get_all_metadata<'a>(&self) -> Result<Vec<MetadataClone>> {
+        let mut data = Vec::new();
+        let conn = self.conn.lock()?;
+        let mut stmt = conn.prepare_cached(
+            "SELECT 
+                ml.id, ml.xmin, ml.xmax, ml.ymin, ml.ymax, ml.zmin, ml.zmax, ml.tmin, ml.tmax,
+                m.designation, m.buffer
+            FROM 
+                Metadata AS m
+            JOIN 
+                MetadataLocations AS ml
+            ON 
+                ml.id = m.id
+            "
+        )?;
+        let mut rows = stmt.raw_query();
+        while let Some(row) = rows.next()? {
+            let xmin = row.get_ref(1)?.as_f64()?;
+            let xmax = row.get_ref(2)?.as_f64()?;
+            let ymin = row.get_ref(3)?.as_f64()?;
+            let ymax = row.get_ref(4)?.as_f64()?;
+            let zmin = row.get_ref(5)?.as_f64()?;
+            let zmax = row.get_ref(6)?.as_f64()?;
+            let tmin = row.get_ref(7)?.as_f64()?;
+            let tmax = row.get_ref(8)?.as_f64()?;
+            let designation = row.get_ref(9)?.as_str()?;
+            let buffer = match row.get_ref(10)? {
+                rusqlite::types::ValueRef::Blob(b) => b,
+                _ => unreachable!("We should always retrieve blobs!"),
+            };
+            data.push(MetadataClone {
+                xmin, xmax,
+                ymin, ymax,
+                zmin, zmax,
+                tmin, tmax,
+                designation: designation.to_string(),
+                buffer: buffer.into(),
+            });
+        }
+        Ok(data)
     }
 }
 
@@ -338,15 +383,17 @@ impl Database for SqlDatabase {
 
     fn get_metadata_blobs_in_bb(
         &self,
-        xmin: f64, xmax: f64,
-        ymin: f64, ymax: f64,
-        zmin: f64, zmax: f64,
-        tmin: f64, tmax: f64,
-        designation: &str,
-        epsilon: Option<f64>,
+        _xmin: f64, _xmax: f64,
+        _ymin: f64, _ymax: f64,
+        _zmin: f64, _zmax: f64,
+        _tmin: f64, _tmax: f64,
+        _designation: &str,
+        _epsilon: Option<f64>,
     ) -> Result<Vec<&Vec<u8>>> {
         todo!();
     }
+
+
 }
 
 

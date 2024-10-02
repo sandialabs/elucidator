@@ -1,8 +1,9 @@
-use crate::database::{Datum, Metadata, Database, Result, DatabaseConfig};
+use crate::{backends::sqlite::SqlDatabase, database::{Database, DatabaseConfig, Datum, Metadata, Result}};
 use rstar::{RTree, RTreeObject, AABB};
 
-use std::{collections::HashMap, ops::Deref};
+use std::collections::HashMap;
 use elucidator::designation::DesignationSpecification;
+
 
 #[derive(Debug)]
 pub struct RTreeDatabase {
@@ -15,8 +16,8 @@ pub struct RTreeConfig {
     /// R*-Tree used internally
     _config:  u8,
 }
-#[derive(Debug, Clone)]
-struct MetadataClone {
+#[derive(Debug, Clone, PartialEq)]
+pub struct MetadataClone {
     pub xmin: f64,
     pub xmax: f64,
     pub ymin: f64,
@@ -95,11 +96,41 @@ impl Database for RTreeDatabase {
             designations: HashMap::new(),
         })
     }
-    fn from_path(_: &str) -> Result<Self> {
-        unimplemented!();
+    fn from_path(filename: &str) -> Result<Self> {
+        let sqlite = SqlDatabase::from_path(filename)?;
+        let designations = sqlite.get_designations();
+        let mds = sqlite.get_all_metadata()?;
+        let rtree = RTree::bulk_load(mds);
+        Ok(RTreeDatabase {
+            rtree,
+            designations,
+        })
     }
-    fn save_as(&self, _filename: &str) -> Result<()> {
-        unimplemented!();
+    fn save_as(&self, filename: &str) -> Result<()> {
+        let mut sqlite = SqlDatabase::new(Some(filename), None)?;
+
+        for (designation, designation_spec) in self.designations.iter() {
+            sqlite.insert_spec_text(&designation, &designation_spec.to_string())?;
+        }
+        let md_clones: Vec<&MetadataClone> = self.rtree.iter().collect();
+        let mds: Vec<Metadata> = md_clones.iter()
+            .map(|m| 
+                Metadata {
+                    xmin: m.xmin,
+                    xmax: m.xmax,
+                    ymin: m.ymin,
+                    ymax: m.ymax,
+                    zmin: m.zmin,
+                    zmax: m.zmax,
+                    tmin: m.tmin,
+                    tmax: m.tmax,
+                    designation: &m.designation,
+                    buffer: &m.buffer,
+                }
+            )
+            .collect(); 
+        sqlite.insert_n_metadata(&mds)?;
+        Ok(())
     }
     fn insert_spec_text(&mut self, designation: &str, spec: &str) -> Result<()> {
         let designation_spec = DesignationSpecification::from_text(spec)?;
@@ -163,17 +194,317 @@ mod test {
     use rand::Rng;
     use rand;
 
+    struct TempFile {
+        pub filepath: String,
+    }
+
+    impl TempFile {
+        pub fn new() -> Result<Self> {
+            let random_filename = random_identifier(10);
+            Self::from(&random_filename)
+        }
+        pub fn from(filename: &str) -> Result<Self> {
+            let temp_dir = std::env::temp_dir();
+            let file_dir = temp_dir.join(random_identifier(10));
+            let filepath = file_dir.join(filename);
+            let filepath = filepath.to_str().unwrap();
+            let _ = std::fs::create_dir_all(file_dir);
+            Ok(TempFile {
+                filepath: filepath.to_string()
+            })
+        }
+    }
+
+    impl std::ops::Drop for TempFile {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.filepath);
+        }
+    }
+
+    fn random_identifier(size: u8) -> String {
+        let mut rng = rand::thread_rng();
+        (0..size)
+            .map(|_| (rng.gen_range(b'a'..=b'z') as char))
+            .collect()
+        
+    }
+    
+    mod config {
+        use super::*;
+        use pretty_assertions::assert_eq;
+    }
+
     mod database {
         use super::*;
         use std::{collections::HashSet, ops::Deref};
         use elucidator::value::DataValue;
         use crate::error::DatabaseError;
 
-
         #[test]
         fn create_in_memory_ok() {
-            assert_eq!(true, true);
-            // assert!(RTreeDatabase::new(None, None).is_ok());
+            assert!(RTreeDatabase::new(None, None).is_ok());
+        }
+
+        #[test]
+        fn from_empty_ok() {
+            let tempfile = TempFile::from("temp.db").unwrap();
+            let db = SqlDatabase::new(Some(&tempfile.filepath), None);
+            drop(db);
+            let loaded_db = RTreeDatabase::from_path(&tempfile.filepath);
+            assert!(loaded_db.is_ok());
+        }
+
+        #[test]
+        fn insert_designation_ok() {
+            let mut db = RTreeDatabase::new(None, None).unwrap();
+            let designation = "Foo";
+            let spec = "foo: u8";
+            let result = db.insert_spec_text(designation, spec);
+            pretty_assertions::assert_eq!(result, Ok(()));
+            let keys = db.designations.keys()
+                .map(String::deref)
+                .collect::<HashSet<&str>>();
+            pretty_assertions::assert_eq!(keys, HashSet::from(["Foo"]));
+        }
+
+        #[test]
+        fn insert_1_ok() {
+            let mut db = RTreeDatabase::new(None, None).unwrap();
+
+            let buffer: &[u8; 1] = &[100; 1];
+            let designation = "Foo";
+            let spec = "foo: u8";
+            let md = Metadata {
+                xmin: 0.0,
+                xmax: 0.0,
+                ymin: 0.0,
+                ymax: 0.0,
+                zmin: 0.0,
+                zmax: 0.0,
+                tmin: 0.0,
+                tmax: 0.0,
+                designation,
+                buffer,
+            };
+
+            let _ = db.insert_spec_text(designation, spec);
+            let result = db.insert_metadata(&md);
+
+            pretty_assertions::assert_eq!(result, Ok(()));
+        }
+
+        #[test]
+        fn insert_bad_designation_fails() {
+            let mut db = RTreeDatabase::new(None, None).unwrap();
+            let designation = "Foo";
+            let spec = "foo u8";
+            let result = db.insert_spec_text(designation, spec);
+            let expected = DesignationSpecification::from_text(spec);
+            assert!(expected.is_err(), "Expected an error from bad designation spec, but got ok instead.");
+            pretty_assertions::assert_eq!(
+                result,
+                Err(DatabaseError::ElucidatorError { reason: expected.unwrap_err() })
+            );
+        }
+
+
+        #[test]
+        fn insert_n_ok() {
+            let mut db = RTreeDatabase::new(None, None).unwrap();
+
+            let designation = "Foo";
+            let spec = "foo: u8";
+            let buffer: &[u8; 1] = &[100; 1];
+            let md1 = Metadata {
+                xmin: 0.0,
+                xmax: 0.0,
+                ymin: 0.0,
+                ymax: 0.0,
+                zmin: 0.0,
+                zmax: 0.0,
+                tmin: 0.0,
+                tmax: 0.0,
+                designation,
+                buffer,
+            };
+
+            let buffer: &[u8; 1] = &[150; 1];
+            let md2 = Metadata {
+                xmin: 0.0,
+                xmax: 0.0,
+                ymin: 0.0,
+                ymax: 0.0,
+                zmin: 0.0,
+                zmax: 0.0,
+                tmin: 0.0,
+                tmax: 0.0,
+                designation,
+                buffer,
+            };
+
+            let buffer: &[u8; 1] = &[200; 1];
+            let md3 = Metadata {
+                xmin: 0.0,
+                xmax: 0.0,
+                ymin: 0.0,
+                ymax: 0.0,
+                zmin: 0.0,
+                zmax: 0.0,
+                tmin: 0.0,
+                tmax: 0.0,
+                designation,
+                buffer,
+            };
+
+            let metadata: Vec<Metadata> = vec![md1, md2, md3];
+
+            let _ = db.insert_spec_text(designation, spec);
+            let result = db.insert_n_metadata(&metadata);
+
+            pretty_assertions::assert_eq!(result, Ok(()));
+        }
+
+        
+        #[test]
+        fn bb_search_ok() {
+            let mut db = RTreeDatabase::new(None, None).unwrap();
+
+            let designation = "Foo";
+            let spec = "foo: u8, bar: f32";
+            let buffer: &[u8; 5] = &[100, 0, 0, 128, 63];
+            let md1 = Metadata {
+                xmin: 0.0,
+                xmax: 0.0,
+                ymin: 0.0,
+                ymax: 0.0,
+                zmin: 0.0,
+                zmax: 0.0,
+                tmin: 0.0,
+                tmax: 0.0,
+                designation,
+                buffer,
+            };
+
+            let buffer: &[u8; 5] = &[150, 0, 36, 116, 73];
+            let md2 = Metadata {
+                xmin: 0.0,
+                xmax: 1.0,
+                ymin: 0.0,
+                ymax: 1.0,
+                zmin: 0.0,
+                zmax: 1.0,
+                tmin: 0.0,
+                tmax: 1.0,
+                designation,
+                buffer,
+            };
+
+            let buffer: &[u8; 5] = &[200, 0, 0, 200, 194];
+            let md3 = Metadata {
+                xmin: 0.0,
+                xmax: 2.0,
+                ymin: 0.0,
+                ymax: 2.0,
+                zmin: 0.0,
+                zmax: 2.0,
+                tmin: 0.0,
+                tmax: 2.0,
+                designation,
+                buffer,
+            };
+
+            let metadata: Vec<Metadata> = vec![md1, md2, md3];
+
+            let _ = db.insert_spec_text(designation, spec);
+            let _ = db.insert_n_metadata(&metadata);
+             
+            let result = db.get_metadata_in_bb(
+                0.0, 1.0,
+                0.0, 1.0,
+                0.0, 1.0,
+                0.0, 1.0,
+                "Foo", 
+                None,
+            );
+
+            let expected: Vec<HashMap<&str, DataValue>> = vec![
+                HashMap::from(
+                    [("foo", DataValue::Byte(100)),
+                     ("bar", DataValue::Float32(1.0))]
+                ),
+                HashMap::from(
+                    [("foo", DataValue::Byte(150)),
+                     ("bar", DataValue::Float32(1000000.0))]
+                ),
+            ];
+            pretty_assertions::assert_eq!(
+                result, 
+                Ok(expected),
+            );
+        }
+
+        #[test]
+        fn test_save_and_recover_ok() {
+            let mut db = RTreeDatabase::new(None, None).unwrap();
+
+            let designation = "Foo";
+            let spec = "foo: u8, bar: f32";
+            let buffer: &[u8; 5] = &[100, 0, 0, 128, 63];
+            let md1 = Metadata {
+                xmin: 0.0,
+                xmax: 0.0,
+                ymin: 0.0,
+                ymax: 0.0,
+                zmin: 0.0,
+                zmax: 0.0,
+                tmin: 0.0,
+                tmax: 0.0,
+                designation,
+                buffer,
+            };
+
+            let buffer: &[u8; 5] = &[150, 0, 36, 116, 73];
+            let md2 = Metadata {
+                xmin: 0.0,
+                xmax: 1.0,
+                ymin: 0.0,
+                ymax: 1.0,
+                zmin: 0.0,
+                zmax: 1.0,
+                tmin: 0.0,
+                tmax: 1.0,
+                designation,
+                buffer,
+            };
+
+            let buffer: &[u8; 5] = &[200, 0, 0, 200, 194];
+            let md3 = Metadata {
+                xmin: 0.0,
+                xmax: 2.0,
+                ymin: 0.0,
+                ymax: 2.0,
+                zmin: 0.0,
+                zmax: 2.0,
+                tmin: 0.0,
+                tmax: 2.0,
+                designation,
+                buffer,
+            };
+
+            let metadata: Vec<Metadata> = vec![md1, md2, md3];
+
+            let _ = db.insert_spec_text(designation, spec);
+            let _ = db.insert_n_metadata(&metadata);
+             
+            let tempfile = TempFile::from("temp.db").unwrap(); 
+            let _ = db.save_as(&tempfile.filepath);
+            
+            let recovered = RTreeDatabase::from_path(&tempfile.filepath).unwrap();
+            pretty_assertions::assert_eq!(db.designations, recovered.designations);
+            pretty_assertions::assert_eq!(
+                db.rtree.iter().collect::<Vec<&MetadataClone>>(),
+                recovered.rtree.iter().collect::<Vec<&MetadataClone>>(),
+            );
         }
     }
 }
