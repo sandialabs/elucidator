@@ -156,7 +156,7 @@ impl SqlDatabase {
     pub fn get_designations(&self) -> HashMap<String, DesignationSpecification> {
         self.designations.clone()
     }
-    pub fn get_all_metadata<'a>(&self) -> Result<Vec<MetadataClone>> {
+    pub fn get_all_metadata(&self) -> Result<Vec<MetadataClone>> {
         let mut data = Vec::new();
         let conn = self.conn.lock()?;
         let mut stmt = conn.prepare_cached(

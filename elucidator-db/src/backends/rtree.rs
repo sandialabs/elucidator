@@ -66,7 +66,7 @@ impl From<&Metadata<'_>> for MetadataClone {
     }
 }
 
-impl<'a> RTreeObject for &MetadataClone {
+impl RTreeObject for &MetadataClone {
     type Envelope = AABB<[f64; 4]>;
 
     fn envelope(&self) -> Self::Envelope {
@@ -77,7 +77,7 @@ impl<'a> RTreeObject for &MetadataClone {
     }
 }
 
-impl<'a> RTreeObject for MetadataClone {
+impl RTreeObject for MetadataClone {
     type Envelope = AABB<[f64; 4]>;
 
     fn envelope(&self) -> Self::Envelope {
