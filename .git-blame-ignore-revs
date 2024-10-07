@@ -1,2 +1,4 @@
 # Running cargo fmt initially
 e073167642f903c62b5d2a2631615cc6b43ebef4
+# Running clippy fix
+832716c47b1a967d7dcf641b2d3f39f050c2dc30
