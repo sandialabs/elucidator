@@ -18,7 +18,7 @@ use std::fmt;
 pub(crate) struct TokenData<'a> {
     pub data: &'a str,
     pub column_start: usize,
-    pub column_end: usize, 
+    pub column_end: usize,
 }
 
 impl<'a> TokenData<'a> {
@@ -29,7 +29,11 @@ impl<'a> TokenData<'a> {
             data.chars().count() == column_end - column_start,
             "Bad sizing; start {column_start} end {column_end}, column width {column_width}, slice {data}"
         );
-        TokenData { data, column_start, column_end }
+        TokenData {
+            data,
+            column_start,
+            column_end,
+        }
     }
 }
 
@@ -57,7 +61,11 @@ impl TokenClone {
 
 impl fmt::Display for TokenClone {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Cols {}-{}: {}", self.column_start, self.column_end, self.data)
+        write!(
+            f,
+            "Cols {}-{}: {}",
+            self.column_start, self.column_end, self.data
+        )
     }
 }
 

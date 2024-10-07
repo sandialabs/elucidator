@@ -2,13 +2,13 @@
 use crate::error::*;
 pub use representable::Representable;
 
+pub mod designation;
+pub mod error;
+pub mod member;
 mod parsing;
-mod validating;
+pub mod representable;
 mod test_utils;
 mod token;
 mod util;
-pub mod error;
-pub mod representable;
-pub mod member;
-pub mod designation;
+mod validating;
 pub mod value;

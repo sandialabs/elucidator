@@ -1,6 +1,6 @@
 use crate::error::ElucidatorError;
 
-type Result <T, E = ElucidatorError> = std::result::Result<T, E>;
+type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Buffer<'a> {
     /// The current position of the buffer cursor
@@ -20,7 +20,7 @@ impl<'a> Buffer<'a> {
         if self.position + n > self.slice.len() {
             // Advance to end so that all future calls fail
             self.position = self.slice.len();
-            Err(ElucidatorError::BufferSizing{
+            Err(ElucidatorError::BufferSizing {
                 expected: n,
                 found: (self.slice.len() - curr_pos),
             })
@@ -59,7 +59,10 @@ mod test {
     fn simple_err() {
         let array = [];
         let mut buffer = Buffer::new(&array);
-        let expected = Err(ElucidatorError::BufferSizing{ expected: 4, found: 0 });
+        let expected = Err(ElucidatorError::BufferSizing {
+            expected: 4,
+            found: 0,
+        });
         assert_eq!(expected, buffer.grab(4));
     }
 
@@ -67,7 +70,10 @@ mod test {
     fn off_by_one_err() {
         let array = [1];
         let mut buffer = Buffer::new(&array);
-        let expected = Err(ElucidatorError::BufferSizing{ expected: 2, found: 1});
+        let expected = Err(ElucidatorError::BufferSizing {
+            expected: 2,
+            found: 1,
+        });
         assert_eq!(expected, buffer.grab(2));
     }
 }

@@ -3,44 +3,44 @@ use std::fmt;
 #[derive(Debug, PartialEq, Clone)]
 pub enum DatabaseError {
     /// Errors related to creating databases.
-    RusqliteError{
+    RusqliteError {
         reason: String,
     },
-    ElucidatorError{
+    ElucidatorError {
         reason: elucidator::error::ElucidatorError,
     },
-    IOError{
+    IOError {
         reason: String,
     },
-    VersionError{
-        reason: String
+    VersionError {
+        reason: String,
     },
-    ConfigError{
-        reason: String
+    ConfigError {
+        reason: String,
     },
-    LockError{
-        reason: String
-    }
+    LockError {
+        reason: String,
+    },
 }
 
 impl fmt::Display for DatabaseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let m = match self {
-            Self::RusqliteError{reason} => {
+            Self::RusqliteError { reason } => {
                 format!("SQL Error: {reason}")
-            },
-            Self::ElucidatorError{reason} => {
+            }
+            Self::ElucidatorError { reason } => {
                 format!("Elucidator Error: {reason}")
-            },
-            Self::IOError{reason} => {
+            }
+            Self::IOError { reason } => {
                 format!("IO Error: {reason}")
-            },
+            }
             Self::VersionError { reason } => {
                 format!("Version Error: {reason}")
-            },
+            }
             Self::ConfigError { reason } => {
                 format!("Config Error: {reason}")
-            },
+            }
             Self::LockError { reason } => {
                 format!("Lock Error: {reason}")
             }
@@ -51,13 +51,17 @@ impl fmt::Display for DatabaseError {
 
 impl From<rusqlite::Error> for DatabaseError {
     fn from(error: rusqlite::Error) -> Self {
-        DatabaseError::RusqliteError { reason: format!("{error}") }
+        DatabaseError::RusqliteError {
+            reason: format!("{error}"),
+        }
     }
 }
 
 impl From<rusqlite::types::FromSqlError> for DatabaseError {
     fn from(error: rusqlite::types::FromSqlError) -> Self {
-        DatabaseError::RusqliteError { reason: format!("{error}") } 
+        DatabaseError::RusqliteError {
+            reason: format!("{error}"),
+        }
     }
 }
 
@@ -69,13 +73,16 @@ impl From<elucidator::error::ElucidatorError> for DatabaseError {
 
 impl From<std::io::Error> for DatabaseError {
     fn from(error: std::io::Error) -> Self {
-        DatabaseError::IOError { reason: format!("{error}") }
+        DatabaseError::IOError {
+            reason: format!("{error}"),
+        }
     }
 }
 
 impl<T> From<std::sync::PoisonError<T>> for DatabaseError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
-        DatabaseError::LockError { reason: format!("{error}") }
+        DatabaseError::LockError {
+            reason: format!("{error}"),
+        }
     }
 }
-

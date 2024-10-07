@@ -2,15 +2,14 @@ use std::{collections::HashMap, io::Read};
 
 use rusqlite::Connection;
 
-use elucidator::designation::DesignationSpecification;
 use crate::{
-    database::{Database, DatabaseConfig, Datum, Metadata, Result, Config}, 
-    error::DatabaseError,
     backends::rtree::MetadataClone,
+    database::{Config, Database, DatabaseConfig, Datum, Metadata, Result},
+    error::DatabaseError,
 };
+use elucidator::designation::DesignationSpecification;
 
-
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
 
 use std::fs::File;
@@ -86,10 +85,7 @@ impl SqlDatabase {
         if self.config.use_wal {
             conn.execute("PRAGMA journal_mode = WAL", [])?;
         }
-        conn.execute(
-            &format!("PRAGMA page_size = {}", self.config.page_size), 
-            []
-        )?;
+        conn.execute(&format!("PRAGMA page_size = {}", self.config.page_size), [])?;
         if self.config.synchronous_off {
             conn.execute("PRAGMA synchronous = OFF", [])?;
         }
@@ -97,15 +93,12 @@ impl SqlDatabase {
             conn.execute("PRAGMA temp_store = MEMORY", [])?;
         }
         if self.config.threads > 0 {
-            conn.execute(
-                &format!("PRAGMA threads = {}",
-                self.config.threads), []
-            )?;
+            conn.execute(&format!("PRAGMA threads = {}", self.config.threads), [])?;
         }
         if self.config.cached_pages > 0 {
             conn.execute(
-                &format!("PRAGMA cache_size = {}",
-                self.config.cached_pages), []
+                &format!("PRAGMA cache_size = {}", self.config.cached_pages),
+                [],
             )?;
         }
         conn.execute(
@@ -128,34 +121,32 @@ impl SqlDatabase {
                 designation TEXT,
                 buffer BLOB
             )",
-            []
+            [],
         )?;
         conn.execute("PRAGMA optimize", [])?;
         Ok(())
     }
     fn verify_version(&self) -> Result<(), DatabaseError> {
         let conn = self.conn.lock()?;
-        let version = conn.query_row(
-            "SELECT SQLITE_VERSION();", 
-            [],
-            |row| row.get::<usize, String>(0)
-        )?
+        let version = conn
+            .query_row("SELECT SQLITE_VERSION();", [], |row| {
+                row.get::<usize, String>(0)
+            })?
             .split(".")
             .map(|n| n.parse::<u32>().unwrap_or(0))
             .collect::<Vec<u32>>();
 
-        
         for (curr_v, min_v) in version.iter().zip(SqlDatabase::MIN_VERSION.iter()) {
             if curr_v > min_v {
                 break;
             }
             if curr_v < min_v {
-                let version_error = DatabaseError::VersionError { 
+                let version_error = DatabaseError::VersionError {
                     reason: format!(
                         "Expected sqlite version of at least {:?}, found {:?}",
                         SqlDatabase::MIN_VERSION,
                         version,
-                    )
+                    ),
                 };
                 Err(version_error)?;
             }
@@ -178,7 +169,7 @@ impl SqlDatabase {
                 MetadataLocations AS ml
             ON 
                 ml.id = m.id
-            "
+            ",
         )?;
         let mut rows = stmt.raw_query();
         while let Some(row) = rows.next()? {
@@ -196,10 +187,14 @@ impl SqlDatabase {
                 _ => unreachable!("We should always retrieve blobs!"),
             };
             data.push(MetadataClone {
-                xmin, xmax,
-                ymin, ymax,
-                zmin, zmax,
-                tmin, tmax,
+                xmin,
+                xmax,
+                ymin,
+                ymax,
+                zmin,
+                zmax,
+                tmin,
+                tmax,
                 designation: designation.to_string(),
                 buffer: buffer.into(),
             });
@@ -211,19 +206,13 @@ impl SqlDatabase {
 impl Database for SqlDatabase {
     fn new(filename: Option<&str>, config: Option<&DatabaseConfig>) -> Result<Self> {
         let config = match config {
-            Some(dbcfg) => {
-                match &dbcfg {
-                    DatabaseConfig::SqliteConfig(sqlcfg) => { sqlcfg.clone() }
-                    _ => {
-                        Err(DatabaseError::ConfigError { 
-                            reason: "Sqlite given config for incorrect backend.".to_string()
-                        })?
-                    }
-                }
-            }
-            None => {
-                SqliteConfig::new()
-            }
+            Some(dbcfg) => match &dbcfg {
+                DatabaseConfig::SqliteConfig(sqlcfg) => sqlcfg.clone(),
+                _ => Err(DatabaseError::ConfigError {
+                    reason: "Sqlite given config for incorrect backend.".to_string(),
+                })?,
+            },
+            None => SqliteConfig::new(),
         };
         let db = if let Some(name) = filename {
             SqlDatabase {
@@ -245,9 +234,8 @@ impl Database for SqlDatabase {
         let conn = Connection::open(filename)?;
         let mut designations = HashMap::new();
         {
-            let mut stmt = conn.prepare_cached(
-                "SELECT designation, spec FROM designation_spec;"
-            )?;
+            let mut stmt =
+                conn.prepare_cached("SELECT designation, spec FROM designation_spec;")?;
             let mut rows = stmt.query([])?;
             while let Some(row) = rows.next()? {
                 let designation: String = row.get(0)?;
@@ -256,7 +244,7 @@ impl Database for SqlDatabase {
                 designations.insert(designation, spec);
             }
         }
-        Ok(SqlDatabase { 
+        Ok(SqlDatabase {
             conn: Arc::new(Mutex::new(conn)),
             designations,
             config: SqliteConfig::new(),
@@ -275,7 +263,8 @@ impl Database for SqlDatabase {
             "INSERT INTO designation_spec (designation, spec) VALUES (?1, ?2)",
             (designation, spec),
         )?;
-        self.designations.insert(designation.to_string(), designation_spec);
+        self.designations
+            .insert(designation.to_string(), designation_spec);
         Ok(())
     }
     fn insert_metadata(&mut self, datum: &Metadata) -> Result<()> {
@@ -285,13 +274,16 @@ impl Database for SqlDatabase {
             let mut stmt = tx.prepare_cached(
                 "INSERT INTO MetadataLocations (xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             )?;
-            stmt.execute([datum.xmin, datum.xmax, datum.ymin, datum.ymax, datum.zmin, datum.zmax, datum.tmin, datum.tmax])?;
+            stmt.execute([
+                datum.xmin, datum.xmax, datum.ymin, datum.ymax, datum.zmin, datum.zmax, datum.tmin,
+                datum.tmax,
+            ])?;
             let mut stmt = tx.prepare_cached(
                 "INSERT INTO Metadata (id, designation, buffer) VALUES (last_insert_rowid(), ?1, ?2)",
             )?;
             stmt.raw_bind_parameter(1, datum.designation)?;
             stmt.raw_bind_parameter(2, datum.buffer)?;
-            stmt.raw_execute()?; 
+            stmt.raw_execute()?;
         }
 
         tx.commit()?;
@@ -306,13 +298,16 @@ impl Database for SqlDatabase {
             let mut stmt = tx.prepare_cached(
                 "INSERT INTO MetadataLocations (xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             )?;
-            stmt.execute([datum.xmin, datum.xmax, datum.ymin, datum.ymax, datum.zmin, datum.zmax, datum.tmin, datum.tmax])?;
+            stmt.execute([
+                datum.xmin, datum.xmax, datum.ymin, datum.ymax, datum.zmin, datum.zmax, datum.tmin,
+                datum.tmax,
+            ])?;
             let mut stmt = tx.prepare_cached(
                 "INSERT INTO Metadata (id, designation, buffer) VALUES (last_insert_rowid(), ?1, ?2)",
             )?;
             stmt.raw_bind_parameter(1, datum.designation)?;
             stmt.raw_bind_parameter(2, datum.buffer)?;
-            stmt.raw_execute()?; 
+            stmt.raw_execute()?;
         }
 
         tx.commit()?;
@@ -321,10 +316,14 @@ impl Database for SqlDatabase {
     }
     fn get_metadata_in_bb(
         &self,
-        xmin: f64, xmax: f64,
-        ymin: f64, ymax: f64,
-        zmin: f64, zmax: f64,
-        tmin: f64, tmax: f64,
+        xmin: f64,
+        xmax: f64,
+        ymin: f64,
+        ymax: f64,
+        zmin: f64,
+        zmax: f64,
+        tmin: f64,
+        tmax: f64,
         designation: &str,
         epsilon: Option<f64>,
     ) -> Result<Vec<Datum>> {
@@ -355,7 +354,7 @@ impl Database for SqlDatabase {
                 ml.zmin >= ?5 AND ml.zmax <= ?6 AND
                 ml.tmin >= ?7 AND ml.tmax <= ?8 AND
                 m.designation = ?9
-            "
+            ",
         )?;
 
         stmt.raw_bind_parameter(1, xmin)?;
@@ -383,25 +382,26 @@ impl Database for SqlDatabase {
 
     fn get_metadata_blobs_in_bb(
         &self,
-        _xmin: f64, _xmax: f64,
-        _ymin: f64, _ymax: f64,
-        _zmin: f64, _zmax: f64,
-        _tmin: f64, _tmax: f64,
+        _xmin: f64,
+        _xmax: f64,
+        _ymin: f64,
+        _ymax: f64,
+        _zmin: f64,
+        _zmax: f64,
+        _tmin: f64,
+        _tmax: f64,
         _designation: &str,
         _epsilon: Option<f64>,
     ) -> Result<Vec<&Vec<u8>>> {
         todo!();
     }
-
-
 }
-
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand::Rng;
     use rand;
+    use rand::Rng;
 
     struct TempFile {
         pub filepath: String,
@@ -419,7 +419,7 @@ mod test {
             let filepath = filepath.to_str().unwrap();
             let _ = std::fs::create_dir_all(file_dir);
             Ok(TempFile {
-                filepath: filepath.to_string()
+                filepath: filepath.to_string(),
             })
         }
     }
@@ -435,9 +435,8 @@ mod test {
         (0..size)
             .map(|_| (rng.gen_range(b'a'..=b'z') as char))
             .collect()
-        
     }
-    
+
     mod config {
         use super::*;
         use pretty_assertions::assert_eq;
@@ -454,9 +453,9 @@ mod test {
 
     mod database {
         use super::*;
-        use std::{collections::HashSet, ops::Deref};
-        use elucidator::value::DataValue;
         use crate::error::DatabaseError;
+        use elucidator::value::DataValue;
+        use std::{collections::HashSet, ops::Deref};
 
         #[test]
         fn create_in_memory_ok() {
@@ -486,7 +485,9 @@ mod test {
             let spec = "foo: u8";
             let result = db.insert_spec_text(designation, spec);
             pretty_assertions::assert_eq!(result, Ok(()));
-            let keys = db.designations.keys()
+            let keys = db
+                .designations
+                .keys()
                 .map(String::deref)
                 .collect::<HashSet<&str>>();
             pretty_assertions::assert_eq!(keys, HashSet::from(["Foo"]));
@@ -525,13 +526,17 @@ mod test {
             let spec = "foo u8";
             let result = db.insert_spec_text(designation, spec);
             let expected = DesignationSpecification::from_text(spec);
-            assert!(expected.is_err(), "Expected an error from bad designation spec, but got ok instead.");
+            assert!(
+                expected.is_err(),
+                "Expected an error from bad designation spec, but got ok instead."
+            );
             pretty_assertions::assert_eq!(
                 result,
-                Err(DatabaseError::ElucidatorError { reason: expected.unwrap_err() })
+                Err(DatabaseError::ElucidatorError {
+                    reason: expected.unwrap_err()
+                })
             );
         }
-
 
         #[test]
         fn insert_n_ok() {
@@ -589,7 +594,6 @@ mod test {
             pretty_assertions::assert_eq!(result, Ok(()));
         }
 
-        
         #[test]
         fn bb_search_ok() {
             let mut db = SqlDatabase::new(None, None).unwrap();
@@ -642,30 +646,20 @@ mod test {
 
             let _ = db.insert_spec_text(designation, spec);
             let _ = db.insert_n_metadata(&metadata);
-             
-            let result = db.get_metadata_in_bb(
-                0.0, 1.0,
-                0.0, 1.0,
-                0.0, 1.0,
-                0.0, 1.0,
-                "Foo", 
-                None,
-            );
+
+            let result = db.get_metadata_in_bb(0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, "Foo", None);
 
             let expected: Vec<HashMap<&str, DataValue>> = vec![
-                HashMap::from(
-                    [("foo", DataValue::Byte(100)),
-                     ("bar", DataValue::Float32(1.0))]
-                ),
-                HashMap::from(
-                    [("foo", DataValue::Byte(150)),
-                     ("bar", DataValue::Float32(1000000.0))]
-                ),
+                HashMap::from([
+                    ("foo", DataValue::Byte(100)),
+                    ("bar", DataValue::Float32(1.0)),
+                ]),
+                HashMap::from([
+                    ("foo", DataValue::Byte(150)),
+                    ("bar", DataValue::Float32(1000000.0)),
+                ]),
             ];
-            pretty_assertions::assert_eq!(
-                result, 
-                Ok(expected),
-            );
+            pretty_assertions::assert_eq!(result, Ok(expected),);
         }
     }
 }

@@ -49,42 +49,31 @@ impl<'a> MemberSpecParserOutput<'a> {
 
     pub fn has_dtype(&self) -> bool {
         match &self.typespec {
-            Some(ts) => {
-                ts.dtype.is_some()
-            },
-            None => { false }
+            Some(ts) => ts.dtype.is_some(),
+            None => false,
         }
     }
 
     pub fn has_sizing(&self) -> bool {
         match &self.typespec {
-            Some(ts) => {
-                ts.sizing.is_some() || ts.is_singleton
-            },
-            None => { false }
+            Some(ts) => ts.sizing.is_some() || ts.is_singleton,
+            None => false,
         }
     }
 }
 
-
-pub fn get_identifier(data: & str, start_col: usize) -> IdentifierParserOutput {
+pub fn get_identifier(data: &str, start_col: usize) -> IdentifierParserOutput {
     let word_output = get_word(data, start_col);
-    let identifier = word_output.word.map(|word| IdentifierToken{ data: word});
+    let identifier = word_output.word.map(|word| IdentifierToken { data: word });
     let errors = word_output.errors;
-    IdentifierParserOutput {
-        identifier,
-        errors,
-    }
+    IdentifierParserOutput { identifier, errors }
 }
 
 pub fn get_dtype(data: &str, start_col: usize) -> DtypeParserOutput {
     let word_output = get_word(data, start_col);
-    let dtype = word_output.word.map(|word| DtypeToken{ data: word });
+    let dtype = word_output.word.map(|word| DtypeToken { data: word });
     let errors = word_output.errors;
-    DtypeParserOutput {
-        dtype,
-        errors,
-    }
+    DtypeParserOutput { dtype, errors }
 }
 
 pub fn get_sizing(data: &str, start_col: usize) -> SizingParserOutput {
@@ -104,19 +93,17 @@ pub fn get_sizing(data: &str, start_col: usize) -> SizingParserOutput {
             sizing: Some(stoken),
             errors: Vec::new(),
         }
-    }
-    else {
+    } else {
         let word_output = get_word(data, start_col);
         let sizing = if let Some(word) = word_output.word {
-            Some(SizingToken{ data: word })
+            Some(SizingToken { data: word })
         } else {
-            unreachable!("get_sizing dispatched when singleton should have been found by get_typespec");
+            unreachable!(
+                "get_sizing dispatched when singleton should have been found by get_typespec"
+            );
         };
         let errors = word_output.errors;
-        SizingParserOutput {
-            sizing,
-            errors,
-        }
+        SizingParserOutput { sizing, errors }
     }
 }
 
@@ -124,12 +111,10 @@ pub fn get_word(data: &str, start_col: usize) -> WordParserOutput {
     let mut errors = Vec::new();
     let id_start = data.char_indices().find(|(_, x)| !x.is_whitespace());
     if id_start.is_none() {
-        errors.push(
-            InternalError::Parsing {
-                offender: TokenClone::new(data, start_col),
-                reason: ParsingFailure::UnexpectedEndOfExpression,
-            }
-        );
+        errors.push(InternalError::Parsing {
+            offender: TokenClone::new(data, start_col),
+            reason: ParsingFailure::UnexpectedEndOfExpression,
+        });
     };
     let word = if errors.is_empty() {
         let (id_byte_start, _) = id_start.unwrap();
@@ -140,55 +125,50 @@ pub fn get_word(data: &str, start_col: usize) -> WordParserOutput {
         Some(TokenData::new(
             &data[id_byte_start..id_byte_end],
             id_char_start + start_col,
-            id_char_end + start_col
+            id_char_end + start_col,
         ))
     } else {
         None
     };
 
-    WordParserOutput {
-        word,
-        errors,
-    }
+    WordParserOutput { word, errors }
 }
 
-
 pub fn get_typespec(data: &str, start_col: usize) -> TypeSpecParserOutput {
-    
-    let sizing ;
+    let sizing;
     let is_singleton;
-    let end_of_dtype ;
+    let end_of_dtype;
     let mut errors = Vec::new();
     if let Some((_, contents)) = data.split_once('[') {
         is_singleton = false;
         let lbracket_pos = data.chars().position(|c| c == '[').unwrap();
-        let lbracket_byte_pos = data.chars().take(lbracket_pos+1).collect::<String>().len();
+        let lbracket_byte_pos = data
+            .chars()
+            .take(lbracket_pos + 1)
+            .collect::<String>()
+            .len();
         end_of_dtype = data.chars().take(lbracket_pos).collect::<String>().len();
         match contents.chars().position(|c| c == ']') {
             Some(rbracket_pos) => {
-                let rbracket_byte_pos = data.chars().take(lbracket_pos + rbracket_pos + 1).collect::<String>().len();
+                let rbracket_byte_pos = data
+                    .chars()
+                    .take(lbracket_pos + rbracket_pos + 1)
+                    .collect::<String>()
+                    .len();
                 let byte_start = lbracket_byte_pos;
                 let byte_end = rbracket_byte_pos;
-                let spo = get_sizing(
-                    &data[byte_start..byte_end],
-                    start_col + lbracket_pos + 1
-                );
+                let spo = get_sizing(&data[byte_start..byte_end], start_col + lbracket_pos + 1);
                 sizing = spo.sizing;
                 for error in &spo.errors {
                     errors.push(error.clone());
                 }
-            },
+            }
             None => {
                 sizing = None;
-                errors.push(
-                    InternalError::Parsing {
-                        offender: TokenClone::new(
-                          &data[lbracket_byte_pos..],
-                          start_col + lbracket_pos,
-                        ),
-                        reason: ParsingFailure::UnexpectedEndOfExpression
-                    }
-                );
+                errors.push(InternalError::Parsing {
+                    offender: TokenClone::new(&data[lbracket_byte_pos..], start_col + lbracket_pos),
+                    reason: ParsingFailure::UnexpectedEndOfExpression,
+                });
             }
         }
     } else {
@@ -201,7 +181,7 @@ pub fn get_typespec(data: &str, start_col: usize) -> TypeSpecParserOutput {
     let dtype = dpo.dtype;
     for error in &dpo.errors {
         errors.push(error.clone());
-    } 
+    }
 
     TypeSpecParserOutput {
         dtype,
@@ -235,14 +215,10 @@ pub fn get_memberspec(data: &str, start_col: usize) -> MemberSpecParserOutput<'_
             Some(n) => start_col + n,
             None => start_col,
         };
-        errors.push(
-            InternalError::Parsing {
-                offender: TokenClone::new(
-                    data.to_string().trim(), start_non_whitespace
-                ),
-                reason: ParsingFailure::MissingIdSpecDelimiter
-            }
-        );
+        errors.push(InternalError::Parsing {
+            offender: TokenClone::new(data.to_string().trim(), start_non_whitespace),
+            reason: ParsingFailure::MissingIdSpecDelimiter,
+        });
     }
 
     MemberSpecParserOutput {
@@ -253,8 +229,7 @@ pub fn get_memberspec(data: &str, start_col: usize) -> MemberSpecParserOutput<'_
 }
 
 pub fn get_metadataspec(data: &str) -> MetadataSpecParserOutput<'_> {
-    
-    let member_outputs: Vec<MemberSpecParserOutput>; 
+    let member_outputs: Vec<MemberSpecParserOutput>;
 
     let mut start_positions = data
         .char_indices()
@@ -277,12 +252,13 @@ pub fn get_metadataspec(data: &str) -> MetadataSpecParserOutput<'_> {
 
     let errors: Vec<InternalError> = member_outputs
         .iter()
-        .flat_map(|member_output| member_output.errors.iter()).cloned()
+        .flat_map(|member_output| member_output.errors.iter())
+        .cloned()
         .collect();
 
     MetadataSpecParserOutput {
         member_outputs,
-        errors
+        errors,
     }
 }
 
@@ -312,16 +288,12 @@ mod test {
     }
 
     fn random_lowercase_ascii_char() -> char {
-        lowercase_ascii_chars()[
-            random::<usize>() % lowercase_ascii_chars().len()
-        ]
+        lowercase_ascii_chars()[random::<usize>() % lowercase_ascii_chars().len()]
     }
 
     fn random_word() -> String {
         let id_len = (random::<u8>() % 9) + 1;
-        (0..id_len)
-            .map(|_| random_lowercase_ascii_char())
-            .collect()
+        (0..id_len).map(|_| random_lowercase_ascii_char()).collect()
     }
 
     fn random_sizing(whitespace: bool) -> String {
@@ -329,7 +301,7 @@ mod test {
             0 => {
                 // Singleton
                 String::from("")
-            },
+            }
             1 => {
                 // Fixed
                 let size: u8 = random();
@@ -338,7 +310,7 @@ mod test {
                 } else {
                     format!("[{size}]")
                 }
-            },
+            }
             2 => {
                 // Dynamic
                 if whitespace {
@@ -346,8 +318,10 @@ mod test {
                 } else {
                     String::from("[]")
                 }
-            },
-            _ => { unreachable!(); },
+            }
+            _ => {
+                unreachable!();
+            }
         }
     }
 
@@ -384,7 +358,6 @@ mod test {
 
     /// Produce a potential whitespace fill
     fn fill() -> String {
-        
         random_whitespace(random::<usize>() % 4)
     }
 
@@ -397,14 +370,10 @@ mod test {
             let text = "  valid_word   ";
             let output = get_word(text, 0);
             let length = "valid_word".len();
-            let token_data = TokenData::new(
-                &text[2..(length + 2)],
-                2,
-                length + 2,
-            );
+            let token_data = TokenData::new(&text[2..(length + 2)], 2, length + 2);
             pretty_assertions::assert_eq!(
                 output,
-                WordParserOutput{
+                WordParserOutput {
                     word: Some(token_data),
                     errors: Vec::new(),
                 }
@@ -431,33 +400,29 @@ mod test {
             let output = get_word(text, 0);
             pretty_assertions::assert_eq!(
                 output,
-                WordParserOutput{
+                WordParserOutput {
                     word: None,
-                    errors: vec![
-                        InternalError::Parsing {
-                            offender: TokenClone::new(text, 0),
-                            reason: ParsingFailure::UnexpectedEndOfExpression
-                        }
-                    ],
+                    errors: vec![InternalError::Parsing {
+                        offender: TokenClone::new(text, 0),
+                        reason: ParsingFailure::UnexpectedEndOfExpression
+                    }],
                 }
-            ); 
+            );
         }
     }
 
     mod identifier {
         use super::*;
-        
+
         #[test]
         fn whitespace_ok() {
             // 2 front spaces, 3 back spaces
             let text = "  valid_identifier   ";
             let output = get_identifier(text, 0);
             let length = "valid_identifier".len();
-            let itoken = IdentifierToken{data: TokenData::new(
-                &text[2..(length + 2)],
-                2,
-                length + 2,
-            )};
+            let itoken = IdentifierToken {
+                data: TokenData::new(&text[2..(length + 2)], 2, length + 2),
+            };
             pretty_assertions::assert_eq!(
                 output,
                 IdentifierParserOutput {
@@ -482,7 +447,7 @@ mod test {
             );
         }
     }
-    
+
     mod dtype {
         use super::*;
 
@@ -492,11 +457,9 @@ mod test {
             let text = "  valid_dtype   ";
             let output = get_dtype(text, 0);
             let length = "valid_dtype".len();
-            let dtoken = DtypeToken{data: TokenData::new(
-                &text[2..(length + 2)],
-                2,
-                length + 2,
-            )};
+            let dtoken = DtypeToken {
+                data: TokenData::new(&text[2..(length + 2)], 2, length + 2),
+            };
             pretty_assertions::assert_eq!(
                 output,
                 DtypeParserOutput {
@@ -531,11 +494,9 @@ mod test {
             let text = "  valid_sizing   ";
             let output = get_sizing(text, 0);
             let length = "valid_sizing".len();
-            let stoken = SizingToken{data: TokenData::new(
-                &text[2..(length + 2)],
-                2,
-                length + 2,
-            )};
+            let stoken = SizingToken {
+                data: TokenData::new(&text[2..(length + 2)], 2, length + 2),
+            };
             pretty_assertions::assert_eq!(
                 output,
                 SizingParserOutput {
@@ -559,18 +520,16 @@ mod test {
                 }
             );
         }
-        
+
         #[test]
         fn dynamic_whitespace_ok() {
             // 2 front spaces, 3 back spaces
             let text = "     ";
             let output = get_sizing(text, 0);
             let length = "".len();
-            let stoken = SizingToken{data: TokenData::new(
-                &text[5..(length + 5)],
-                5,
-                length + 5,
-            )};
+            let stoken = SizingToken {
+                data: TokenData::new(&text[5..(length + 5)], 5, length + 5),
+            };
             pretty_assertions::assert_eq!(
                 output,
                 SizingParserOutput {
@@ -579,7 +538,7 @@ mod test {
                 }
             );
         }
-       
+
         #[test]
         fn dynamic_empty_ok() {
             let text = "";
@@ -593,9 +552,7 @@ mod test {
                     errors: Vec::new(),
                 }
             );
-        } 
-
-
+        }
     }
 
     mod type_spec {
@@ -607,11 +564,9 @@ mod test {
             let text = "  valid_singleton   ";
             let output = get_typespec(text, 0);
             let length = "valid_singleton".len();
-            let dtoken = DtypeToken{data: TokenData::new(
-                &text[2..(length + 2)],
-                2,
-                length + 2,
-            )};
+            let dtoken = DtypeToken {
+                data: TokenData::new(&text[2..(length + 2)], 2, length + 2),
+            };
             pretty_assertions::assert_eq!(
                 output,
                 TypeSpecParserOutput {
@@ -628,7 +583,7 @@ mod test {
             let text = "valid_singleton";
             let output = get_typespec(text, 0);
             let data = TokenData::new(text, 0, text.len());
-            let dtoken = DtypeToken{data};
+            let dtoken = DtypeToken { data };
             let stoken = None;
             pretty_assertions::assert_eq!(
                 output,
@@ -640,8 +595,6 @@ mod test {
                 }
             );
         }
-
-
 
         #[test]
         fn fixed_whitespace_ok() {
@@ -656,21 +609,15 @@ mod test {
             let length = dtype_text.len();
             let start = whitespace.len();
             let end = start + length;
-            let dtoken = DtypeToken{
-                data: TokenData::new(
-                    &text[start..(end)],
-                    start,
-                    end,
-            )};
+            let dtoken = DtypeToken {
+                data: TokenData::new(&text[start..(end)], start, end),
+            };
             let length = sizing_text.len();
             let start = whitespace.len() + dtype_text.len() + 1 + whitespace.len();
             let end = start + length;
-            let stoken = SizingToken{
-                data: TokenData::new(
-                    &text[start..(end)],
-                    start,
-                    end,
-            )};
+            let stoken = SizingToken {
+                data: TokenData::new(&text[start..(end)], start, end),
+            };
             let output = get_typespec(text, 0);
             pretty_assertions::assert_eq!(
                 output,
@@ -696,21 +643,15 @@ mod test {
             let length = dtype_text.len();
             let start = whitespace.len();
             let end = start + length;
-            let dtoken = DtypeToken{
-                data: TokenData::new(
-                    &text[start..(end)],
-                    start,
-                    end,
-            )};
+            let dtoken = DtypeToken {
+                data: TokenData::new(&text[start..(end)], start, end),
+            };
             let length = sizing_text.len();
             let start = whitespace.len() + dtype_text.len() + 1 + whitespace.len();
             let end = start + length;
-            let stoken = SizingToken{
-                data: TokenData::new(
-                    &text[start..(end)],
-                    start,
-                    end,
-            )};
+            let stoken = SizingToken {
+                data: TokenData::new(&text[start..(end)], start, end),
+            };
             let output = get_typespec(text, 0);
             pretty_assertions::assert_eq!(
                 output,
@@ -736,23 +677,19 @@ mod test {
             let length = dtype_text.len();
             let start = whitespace.len();
             let end = start + length;
-            let dtoken = DtypeToken{
-                data: TokenData::new(
-                    &text[start..(end)],
-                    start,
-                    end,
-            )};
+            let dtoken = DtypeToken {
+                data: TokenData::new(&text[start..(end)], start, end),
+            };
             let output = get_typespec(text, 0);
             pretty_assertions::assert_eq!(
                 output,
                 TypeSpecParserOutput {
                     sizing: None,
                     dtype: Some(dtoken),
-                    errors: vec![
-                        InternalError::Parsing {
-                            offender: TokenClone::new(&sizing_body, 11),
-                            reason: ParsingFailure::UnexpectedEndOfExpression }
-                    ],
+                    errors: vec![InternalError::Parsing {
+                        offender: TokenClone::new(&sizing_body, 11),
+                        reason: ParsingFailure::UnexpectedEndOfExpression
+                    }],
                     is_singleton: false,
                 }
             );
@@ -762,7 +699,7 @@ mod test {
     // Tests marked "invalid" are invalid according to the standard, but are parseable.
     mod member_spec {
         use super::*;
-    
+
         /// For making sure text with no whitespace works
         #[allow(unused_assignments)]
         fn run_ok_simple(ident: &str, dtype: &str, sizing: Option<&str>) {
@@ -795,9 +732,11 @@ mod test {
                 curr_end += size.chars().count();
                 size_string = String::from(size);
                 Some(SizingToken {
-                    data: TokenData::new(&size_string, curr_start, curr_end)
+                    data: TokenData::new(&size_string, curr_start, curr_end),
                 })
-            } else { None };
+            } else {
+                None
+            };
 
             pretty_assertions::assert_eq!(output.identifier, Some(t_identifier));
             pretty_assertions::assert_eq!(output.typespec.clone().unwrap().dtype, Some(t_dtype));
@@ -866,9 +805,11 @@ mod test {
                     curr_start = curr_end;
                 }
                 Some(SizingToken {
-                    data: TokenData::new(&size_string, curr_start, curr_end)
+                    data: TokenData::new(&size_string, curr_start, curr_end),
                 })
-            } else { None };
+            } else {
+                None
+            };
 
             pretty_assertions::assert_eq!(output.identifier, Some(t_identifier));
             pretty_assertions::assert_eq!(output.typespec.clone().unwrap().dtype, Some(t_dtype));
@@ -896,7 +837,7 @@ mod test {
                 run_ok_whitespace("foo", "u8", Some("1000"));
             }
         }
-    
+
         #[test]
         fn ok_invalid_string() {
             run_ok_simple("5ever", "silly", None);
@@ -943,12 +884,10 @@ mod test {
                 MemberSpecParserOutput {
                     identifier: None,
                     typespec: None,
-                    errors: vec![
-                        InternalError::Parsing {
-                            offender: TokenClone::new("foo u8", 2),
-                            reason: ParsingFailure::MissingIdSpecDelimiter
-                        }
-                    ]
+                    errors: vec![InternalError::Parsing {
+                        offender: TokenClone::new("foo u8", 2),
+                        reason: ParsingFailure::MissingIdSpecDelimiter
+                    }]
                 }
             )
         }
@@ -964,9 +903,7 @@ mod test {
             } else {
                 random_memberspec
             };
-            let member_specs: Vec<String> = (0..n_specs)
-                .map(|_| generator())
-                .collect();
+            let member_specs: Vec<String> = (0..n_specs).map(|_| generator()).collect();
             let metadata_spec_text = member_specs.join(",");
             let mut start_positions = metadata_spec_text
                 .char_indices()
@@ -997,9 +934,7 @@ mod test {
             pretty_assertions::assert_eq!(
                 metadata_spec,
                 MetadataSpecParserOutput {
-                    member_outputs: vec![
-                        get_memberspec(spec, 0),
-                    ],
+                    member_outputs: vec![get_memberspec(spec, 0),],
                     errors: Vec::new(),
                 }
             );
@@ -1076,7 +1011,8 @@ mod test {
             let metadata_spec = get_metadataspec(&spec);
             let expected_errors: Vec<InternalError> = parsed_members
                 .iter()
-                .flat_map(|x| x.errors.iter()).cloned()
+                .flat_map(|x| x.errors.iter())
+                .cloned()
                 .collect();
             pretty_assertions::assert_eq!(
                 metadata_spec,
@@ -1089,6 +1025,4 @@ mod test {
 
         // TODO: handle case where all memberspecs are invalid
     }
-
-    
 }

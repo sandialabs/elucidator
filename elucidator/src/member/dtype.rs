@@ -21,7 +21,10 @@ pub enum Dtype {
 fn buff_size_or_err<T>(buffer: &[u8]) -> Result<usize, ElucidatorError> {
     let expected_buff_size = std::mem::size_of::<T>();
     if buffer.len() != expected_buff_size {
-        Err(ElucidatorError::BufferSizing { expected: expected_buff_size, found: buffer.len() })?
+        Err(ElucidatorError::BufferSizing {
+            expected: expected_buff_size,
+            found: buffer.len(),
+        })?
     }
     Ok(expected_buff_size)
 }
@@ -29,107 +32,172 @@ fn buff_size_or_err<T>(buffer: &[u8]) -> Result<usize, ElucidatorError> {
 impl Dtype {
     pub fn get_size(&self) -> Option<usize> {
         match &self {
-            Self::Byte => { Some(std::mem::size_of::<u8>()) },
-            Self::UnsignedInteger16 => { Some(std::mem::size_of::<u16>()) },
-            Self::UnsignedInteger32 => { Some(std::mem::size_of::<u32>()) },
-            Self::UnsignedInteger64 => { Some(std::mem::size_of::<u64>()) },
-            Self::SignedInteger8 => { Some(std::mem::size_of::<i8>()) },
-            Self::SignedInteger16 => { Some(std::mem::size_of::<i16>()) },
-            Self::SignedInteger32 => { Some(std::mem::size_of::<i32>()) },
-            Self::SignedInteger64 => { Some(std::mem::size_of::<i64>()) },
-            Self::Float32 => { Some(std::mem::size_of::<f32>()) },
-            Self::Float64 => { Some(std::mem::size_of::<f64>()) },
-            Self::Str => { None },
+            Self::Byte => Some(std::mem::size_of::<u8>()),
+            Self::UnsignedInteger16 => Some(std::mem::size_of::<u16>()),
+            Self::UnsignedInteger32 => Some(std::mem::size_of::<u32>()),
+            Self::UnsignedInteger64 => Some(std::mem::size_of::<u64>()),
+            Self::SignedInteger8 => Some(std::mem::size_of::<i8>()),
+            Self::SignedInteger16 => Some(std::mem::size_of::<i16>()),
+            Self::SignedInteger32 => Some(std::mem::size_of::<i32>()),
+            Self::SignedInteger64 => Some(std::mem::size_of::<i64>()),
+            Self::Float32 => Some(std::mem::size_of::<f32>()),
+            Self::Float64 => Some(std::mem::size_of::<f64>()),
+            Self::Str => None,
         }
     }
-    
+
     pub fn from_buffer(&self, buffer: &[u8]) -> Result<Box<dyn Representable>, ElucidatorError> {
         match self {
             Self::Byte => {
                 let buffer_len = buff_size_or_err::<u8>(buffer)?;
                 Ok(Box::new(u8::from_le_bytes(
-                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
+                    buffer
+                        .iter()
+                        .take(buffer_len)
+                        .copied()
+                        .collect::<Vec<u8>>()
+                        .try_into()
+                        .unwrap(),
                 )))
-            },
+            }
             Self::UnsignedInteger16 => {
                 let buffer_len = buff_size_or_err::<u16>(buffer)?;
                 Ok(Box::new(u16::from_le_bytes(
-                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
+                    buffer
+                        .iter()
+                        .take(buffer_len)
+                        .copied()
+                        .collect::<Vec<u8>>()
+                        .try_into()
+                        .unwrap(),
                 )))
-            },
+            }
             Self::UnsignedInteger32 => {
                 let buffer_len = buff_size_or_err::<u32>(buffer)?;
                 Ok(Box::new(u32::from_le_bytes(
-                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
+                    buffer
+                        .iter()
+                        .take(buffer_len)
+                        .copied()
+                        .collect::<Vec<u8>>()
+                        .try_into()
+                        .unwrap(),
                 )))
-            },
+            }
             Self::UnsignedInteger64 => {
                 let buffer_len = buff_size_or_err::<u64>(buffer)?;
                 Ok(Box::new(u64::from_le_bytes(
-                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
+                    buffer
+                        .iter()
+                        .take(buffer_len)
+                        .copied()
+                        .collect::<Vec<u8>>()
+                        .try_into()
+                        .unwrap(),
                 )))
-            },
+            }
             Self::SignedInteger8 => {
                 let buffer_len = buff_size_or_err::<i8>(buffer)?;
                 Ok(Box::new(i8::from_le_bytes(
-                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
+                    buffer
+                        .iter()
+                        .take(buffer_len)
+                        .copied()
+                        .collect::<Vec<u8>>()
+                        .try_into()
+                        .unwrap(),
                 )))
-            },
+            }
             Self::SignedInteger16 => {
                 let buffer_len = buff_size_or_err::<i16>(buffer)?;
                 Ok(Box::new(i16::from_le_bytes(
-                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
+                    buffer
+                        .iter()
+                        .take(buffer_len)
+                        .copied()
+                        .collect::<Vec<u8>>()
+                        .try_into()
+                        .unwrap(),
                 )))
-            },
+            }
             Self::SignedInteger32 => {
                 let buffer_len = buff_size_or_err::<i32>(buffer)?;
                 Ok(Box::new(i32::from_le_bytes(
-                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
+                    buffer
+                        .iter()
+                        .take(buffer_len)
+                        .copied()
+                        .collect::<Vec<u8>>()
+                        .try_into()
+                        .unwrap(),
                 )))
-            },
+            }
             Self::SignedInteger64 => {
                 let buffer_len = buff_size_or_err::<i64>(buffer)?;
                 Ok(Box::new(i64::from_le_bytes(
-                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
+                    buffer
+                        .iter()
+                        .take(buffer_len)
+                        .copied()
+                        .collect::<Vec<u8>>()
+                        .try_into()
+                        .unwrap(),
                 )))
-            },
+            }
             Self::Float32 => {
                 let buffer_len = buff_size_or_err::<f32>(buffer)?;
                 Ok(Box::new(f32::from_le_bytes(
-                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
+                    buffer
+                        .iter()
+                        .take(buffer_len)
+                        .copied()
+                        .collect::<Vec<u8>>()
+                        .try_into()
+                        .unwrap(),
                 )))
-            },
+            }
             Self::Float64 => {
                 let buffer_len = buff_size_or_err::<f64>(buffer)?;
                 Ok(Box::new(f64::from_le_bytes(
-                    buffer.iter().take(buffer_len).copied().collect::<Vec<u8>>().try_into().unwrap()
+                    buffer
+                        .iter()
+                        .take(buffer_len)
+                        .copied()
+                        .collect::<Vec<u8>>()
+                        .try_into()
+                        .unwrap(),
                 )))
-            },
+            }
             Self::Str => {
                 let buffer_len = buffer.len();
                 if buffer_len < 8 {
-                    Err(ElucidatorError::BufferSizing { expected: 8, found: buffer_len })?
+                    Err(ElucidatorError::BufferSizing {
+                        expected: 8,
+                        found: buffer_len,
+                    })?
                 }
                 let string_length_buffer = buffer.iter().take(8).copied().collect::<Vec<u8>>();
                 let dt = Dtype::UnsignedInteger64;
-                let string_length = dt.from_buffer(&string_length_buffer).unwrap().as_u64().unwrap() as usize;
+                let string_length = dt
+                    .from_buffer(&string_length_buffer)
+                    .unwrap()
+                    .as_u64()
+                    .unwrap() as usize;
 
                 let expected_buffer_len: usize = string_length + 8;
 
                 if buffer_len != expected_buffer_len {
-                    Err(ElucidatorError::BufferSizing { expected: expected_buffer_len, found: buffer_len })?
+                    Err(ElucidatorError::BufferSizing {
+                        expected: expected_buffer_len,
+                        found: buffer_len,
+                    })?
                 }
-                let s = String::from_utf8(
-                    buffer[8..].to_vec()
-                );
+                let s = String::from_utf8(buffer[8..].to_vec());
                 match s {
-                    Ok(o) => { Ok(Box::new(o)) }
-                    Err(e) => {
-                        Err(ElucidatorError::FromUtf8 { source: e })
-                    }
+                    Ok(o) => Ok(Box::new(o)),
+                    Err(e) => Err(ElucidatorError::FromUtf8 { source: e }),
                 }
-
-            },
+            }
         }
     }
 }
@@ -270,6 +338,9 @@ mod tests {
         let utf8_error = String::from_utf8(vec![0, 159]).err().unwrap();
         let dt = Dtype::Str;
         let value = dt.from_buffer(&buffer);
-        assert_eq!(value.err().unwrap(), ElucidatorError::FromUtf8 { source: utf8_error });
+        assert_eq!(
+            value.err().unwrap(),
+            ElucidatorError::FromUtf8 { source: utf8_error }
+        );
     }
 }

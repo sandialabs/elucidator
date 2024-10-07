@@ -1,24 +1,19 @@
-use pyo3::{
-    exceptions::PyValueError,
-    prelude::*,
-    types::PyDict,
-};
+use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict};
 
-use elucidator::{
-    error::ElucidatorError,
-    designation::DesignationSpecification,
-    value::DataValue,
-};
+use elucidator::{designation::DesignationSpecification, error::ElucidatorError, value::DataValue};
 
 use elucidator_db::{
-    error::DatabaseError,
     backends::rtree::RTreeDatabase,
     database::{Database, Metadata},
+    error::DatabaseError,
 };
 
 use std::collections::HashMap;
 
-fn value2obj<'py, 'a>(py: Python<'py>, dv: &HashMap<&'a str, DataValue>) -> PyResult<Bound<'py, PyDict>> {
+fn value2obj<'py, 'a>(
+    py: Python<'py>,
+    dv: &HashMap<&'a str, DataValue>,
+) -> PyResult<Bound<'py, PyDict>> {
     let d = PyDict::new_bound(py);
 
     for (k, v) in dv {
@@ -43,7 +38,7 @@ fn value2obj<'py, 'a>(py: Python<'py>, dv: &HashMap<&'a str, DataValue>) -> PyRe
             DataValue::SignedInteger32Array(v) => d.set_item(k, v)?,
             DataValue::SignedInteger64Array(v) => d.set_item(k, v)?,
             DataValue::Float32Array(v) => d.set_item(k, v)?,
-            DataValue::Float64Array(v) => d.set_item(k, v)?, 
+            DataValue::Float64Array(v) => d.set_item(k, v)?,
         }
     }
     Ok(d)
@@ -104,7 +99,10 @@ struct BoundingBox {
 impl BoundingBox {
     #[new]
     fn new(a: &Point, b: &Point) -> Self {
-        BoundingBox { a: a.clone(), b: b.clone() }
+        BoundingBox {
+            a: a.clone(),
+            b: b.clone(),
+        }
     }
 }
 
@@ -122,15 +120,20 @@ impl Session {
             Ok(o) => o,
             Err(e) => Err(Into::<PyErr>::into(ApiError::from(e)))?,
         };
-        Ok( Session { db } )
+        Ok(Session { db })
     }
     fn add_designation(&mut self, name: &str, spec: &str) -> PyResult<()> {
         match self.db.insert_spec_text(name, spec) {
             Ok(()) => Ok(()),
-            Err(e) => Err(Into::<PyErr>::into(ApiError::from(e)))?
+            Err(e) => Err(Into::<PyErr>::into(ApiError::from(e)))?,
         }
     }
-    fn insert_metadata(&mut self, designation: &str, bb: &BoundingBox, buffer: &[u8]) -> PyResult<()> {
+    fn insert_metadata(
+        &mut self,
+        designation: &str,
+        bb: &BoundingBox,
+        buffer: &[u8],
+    ) -> PyResult<()> {
         let m = Metadata {
             xmin: bb.a.x,
             xmax: bb.b.x,
@@ -145,26 +148,30 @@ impl Session {
         };
         match self.db.insert_metadata(&m) {
             Ok(()) => Ok(()),
-            Err(e) => Err(Into::<PyErr>::into(ApiError::from(e)))?
+            Err(e) => Err(Into::<PyErr>::into(ApiError::from(e)))?,
         }
     }
-    fn get_metadata<'py>(&self, py: Python<'py>, designation: &str, bb: &BoundingBox, eps: Option<f64>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+    fn get_metadata<'py>(
+        &self,
+        py: Python<'py>,
+        designation: &str,
+        bb: &BoundingBox,
+        eps: Option<f64>,
+    ) -> PyResult<Vec<Bound<'py, PyDict>>> {
         let r = self.db.get_metadata_in_bb(
-            bb.a.x, bb.b.x,
-            bb.a.y, bb.b.y,
-            bb.a.z, bb.b.z,
-            bb.a.t, bb.b.t,
+            bb.a.x,
+            bb.b.x,
+            bb.a.y,
+            bb.b.y,
+            bb.a.z,
+            bb.b.z,
+            bb.a.t,
+            bb.b.t,
             designation,
             eps,
         );
         match &r {
-            Ok(o) => {
-                Ok(
-                    o.iter()
-                    .map(|x| value2obj(py, x).unwrap())
-                    .collect()
-                )
-            },
+            Ok(o) => Ok(o.iter().map(|x| value2obj(py, x).unwrap()).collect()),
             Err(e) => Err(Into::<PyErr>::into(ApiError::from(e)))?,
         }
     }

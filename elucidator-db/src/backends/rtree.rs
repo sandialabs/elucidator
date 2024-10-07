@@ -1,9 +1,11 @@
-use crate::{backends::sqlite::SqlDatabase, database::{Database, DatabaseConfig, Datum, Metadata, Result}};
+use crate::{
+    backends::sqlite::SqlDatabase,
+    database::{Database, DatabaseConfig, Datum, Metadata, Result},
+};
 use rstar::{RTree, RTreeObject, AABB};
 
-use std::collections::HashMap;
 use elucidator::designation::DesignationSpecification;
-
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct RTreeDatabase {
@@ -14,7 +16,7 @@ pub struct RTreeDatabase {
 
 pub struct RTreeConfig {
     /// R*-Tree used internally
-    _config:  u8,
+    _config: u8,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct MetadataClone {
@@ -42,7 +44,7 @@ impl From<Metadata<'_>> for MetadataClone {
             tmin: m.tmin,
             tmax: m.tmax,
             designation: m.designation.to_string(),
-            buffer: m.buffer.into()
+            buffer: m.buffer.into(),
         }
     }
 }
@@ -59,7 +61,7 @@ impl From<&Metadata<'_>> for MetadataClone {
             tmin: m.tmin,
             tmax: m.tmax,
             designation: m.designation.to_string(),
-            buffer: m.buffer.into()
+            buffer: m.buffer.into(),
         }
     }
 }
@@ -67,8 +69,7 @@ impl From<&Metadata<'_>> for MetadataClone {
 impl<'a> RTreeObject for &MetadataClone {
     type Envelope = AABB<[f64; 4]>;
 
-    fn envelope(&self) -> Self::Envelope
-    {
+    fn envelope(&self) -> Self::Envelope {
         AABB::from_corners(
             (self.xmin, self.ymin, self.zmin, self.tmin).into(),
             (self.xmax, self.ymax, self.zmax, self.tmax).into(),
@@ -79,15 +80,13 @@ impl<'a> RTreeObject for &MetadataClone {
 impl<'a> RTreeObject for MetadataClone {
     type Envelope = AABB<[f64; 4]>;
 
-    fn envelope(&self) -> Self::Envelope
-    {
+    fn envelope(&self) -> Self::Envelope {
         AABB::from_corners(
             (self.xmin, self.ymin, self.zmin, self.tmin).into(),
             (self.xmax, self.ymax, self.zmax, self.tmax).into(),
         )
     }
 }
-
 
 impl Database for RTreeDatabase {
     fn new(_: Option<&str>, _: Option<&DatabaseConfig>) -> Result<Self> {
@@ -112,7 +111,9 @@ impl Database for RTreeDatabase {
         for (designation, designation_spec) in self.designations.iter() {
             sqlite.insert_spec_text(&designation, &designation_spec.to_string())?;
         }
-        let md_results: Result<Vec<()>, crate::error::DatabaseError> = self.rtree.iter()
+        let md_results: Result<Vec<()>, crate::error::DatabaseError> = self
+            .rtree
+            .iter()
             .map(|m| {
                 let md = Metadata {
                     xmin: m.xmin,
@@ -134,7 +135,8 @@ impl Database for RTreeDatabase {
     }
     fn insert_spec_text(&mut self, designation: &str, spec: &str) -> Result<()> {
         let designation_spec = DesignationSpecification::from_text(spec)?;
-        self.designations.insert(designation.to_string(), designation_spec);
+        self.designations
+            .insert(designation.to_string(), designation_spec);
         Ok(())
     }
     fn insert_metadata(&mut self, datum: &Metadata) -> Result<()> {
@@ -149,50 +151,65 @@ impl Database for RTreeDatabase {
     }
     fn get_metadata_in_bb(
         &self,
-        xmin: f64, xmax: f64,
-        ymin: f64, ymax: f64,
-        zmin: f64, zmax: f64,
-        tmin: f64, tmax: f64,
+        xmin: f64,
+        xmax: f64,
+        ymin: f64,
+        ymax: f64,
+        zmin: f64,
+        zmax: f64,
+        tmin: f64,
+        tmax: f64,
         designation: &str,
         epsilon: Option<f64>,
     ) -> Result<Vec<Datum>> {
         let d = self.designations.get(designation).unwrap();
-        let blobs = self.get_metadata_blobs_in_bb(xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax, designation, epsilon)?;
-        Ok(blobs.iter()
-            .map(|b| d.interpret_enum(b).unwrap())
-            .collect()
-        )
-
+        let blobs = self.get_metadata_blobs_in_bb(
+            xmin,
+            xmax,
+            ymin,
+            ymax,
+            zmin,
+            zmax,
+            tmin,
+            tmax,
+            designation,
+            epsilon,
+        )?;
+        Ok(blobs.iter().map(|b| d.interpret_enum(b).unwrap()).collect())
     }
 
     fn get_metadata_blobs_in_bb(
         &self,
-        xmin: f64, xmax: f64,
-        ymin: f64, ymax: f64,
-        zmin: f64, zmax: f64,
-        tmin: f64, tmax: f64,
+        xmin: f64,
+        xmax: f64,
+        ymin: f64,
+        ymax: f64,
+        zmin: f64,
+        zmax: f64,
+        tmin: f64,
+        tmax: f64,
         designation: &str,
         epsilon: Option<f64>,
     ) -> Result<Vec<&Vec<u8>>> {
         let eps = epsilon.unwrap_or(0.0);
         let mins = [xmin - eps, ymin - eps, zmin - eps, tmin - eps];
         let maxs = [xmax + eps, ymax + eps, zmax + eps, tmax + eps];
-        
+
         let bb = AABB::from_corners(mins, maxs);
-        Ok(
-            self.rtree.locate_in_envelope(&bb)
-                .filter(|m| m.designation == designation)
-                .map(|m| &m.buffer)
-                .collect()
-        )
+        Ok(self
+            .rtree
+            .locate_in_envelope(&bb)
+            .filter(|m| m.designation == designation)
+            .map(|m| &m.buffer)
+            .collect())
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand::Rng;
     use rand;
+    use rand::Rng;
 
     struct TempFile {
         pub filepath: String,
@@ -210,7 +227,7 @@ mod test {
             let filepath = filepath.to_str().unwrap();
             let _ = std::fs::create_dir_all(file_dir);
             Ok(TempFile {
-                filepath: filepath.to_string()
+                filepath: filepath.to_string(),
             })
         }
     }
@@ -226,9 +243,8 @@ mod test {
         (0..size)
             .map(|_| (rng.gen_range(b'a'..=b'z') as char))
             .collect()
-        
     }
-    
+
     mod config {
         use super::*;
         use pretty_assertions::assert_eq;
@@ -236,9 +252,9 @@ mod test {
 
     mod database {
         use super::*;
-        use std::{collections::HashSet, ops::Deref};
-        use elucidator::value::DataValue;
         use crate::error::DatabaseError;
+        use elucidator::value::DataValue;
+        use std::{collections::HashSet, ops::Deref};
 
         #[test]
         fn create_in_memory_ok() {
@@ -261,7 +277,9 @@ mod test {
             let spec = "foo: u8";
             let result = db.insert_spec_text(designation, spec);
             pretty_assertions::assert_eq!(result, Ok(()));
-            let keys = db.designations.keys()
+            let keys = db
+                .designations
+                .keys()
                 .map(String::deref)
                 .collect::<HashSet<&str>>();
             pretty_assertions::assert_eq!(keys, HashSet::from(["Foo"]));
@@ -300,13 +318,17 @@ mod test {
             let spec = "foo u8";
             let result = db.insert_spec_text(designation, spec);
             let expected = DesignationSpecification::from_text(spec);
-            assert!(expected.is_err(), "Expected an error from bad designation spec, but got ok instead.");
+            assert!(
+                expected.is_err(),
+                "Expected an error from bad designation spec, but got ok instead."
+            );
             pretty_assertions::assert_eq!(
                 result,
-                Err(DatabaseError::ElucidatorError { reason: expected.unwrap_err() })
+                Err(DatabaseError::ElucidatorError {
+                    reason: expected.unwrap_err()
+                })
             );
         }
-
 
         #[test]
         fn insert_n_ok() {
@@ -364,7 +386,6 @@ mod test {
             pretty_assertions::assert_eq!(result, Ok(()));
         }
 
-        
         #[test]
         fn bb_search_ok() {
             let mut db = RTreeDatabase::new(None, None).unwrap();
@@ -417,25 +438,18 @@ mod test {
 
             let _ = db.insert_spec_text(designation, spec);
             let _ = db.insert_n_metadata(&metadata);
-             
-            let result = db.get_metadata_in_bb(
-                0.0, 1.0,
-                0.0, 1.0,
-                0.0, 1.0,
-                0.0, 1.0,
-                "Foo", 
-                None,
-            );
+
+            let result = db.get_metadata_in_bb(0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, "Foo", None);
 
             let expected: Vec<HashMap<&str, DataValue>> = vec![
-                HashMap::from(
-                    [("foo", DataValue::Byte(100)),
-                     ("bar", DataValue::Float32(1.0))]
-                ),
-                HashMap::from(
-                    [("foo", DataValue::Byte(150)),
-                     ("bar", DataValue::Float32(1000000.0))]
-                ),
+                HashMap::from([
+                    ("foo", DataValue::Byte(100)),
+                    ("bar", DataValue::Float32(1.0)),
+                ]),
+                HashMap::from([
+                    ("foo", DataValue::Byte(150)),
+                    ("bar", DataValue::Float32(1000000.0)),
+                ]),
             ];
             assert!(result.is_ok());
             let result = result.unwrap();
@@ -497,10 +511,10 @@ mod test {
 
             let _ = db.insert_spec_text(designation, spec);
             let _ = db.insert_n_metadata(&metadata);
-             
-            let tempfile = TempFile::from("temp.db").unwrap(); 
+
+            let tempfile = TempFile::from("temp.db").unwrap();
             let _ = db.save_as(&tempfile.filepath);
-            
+
             let recovered = RTreeDatabase::from_path(&tempfile.filepath).unwrap();
             pretty_assertions::assert_eq!(db.designations, recovered.designations);
             let db_md = db.rtree.iter().collect::<Vec<&MetadataClone>>();
