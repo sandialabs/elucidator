@@ -245,6 +245,7 @@ pub extern "C" fn fetch_sample_blob() -> *mut BufNode {
 /// return status. If the status is not ELUCIDATOR_OK, an error has occurred
 /// and the value of the passed pointer has not been updated.
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn new_session(sh: *mut SessionHandle, _kind: DatabaseKind) -> ElucidatorStatus {
     let rdb = match RTreeDatabase::new(None, None) {
         Ok(o) => o,
@@ -263,6 +264,7 @@ pub extern "C" fn new_session(sh: *mut SessionHandle, _kind: DatabaseKind) -> El
 /// Get a string based on the provided handle. If the handle cannot be foundor is NULL, the
 /// returned string will be NULL. You must free the returned pointer.
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn get_error_string(eh: *const ErrorHandle) -> *mut c_char {
     unsafe {
         match ERROR_MAP.read().unwrap().get(&*eh) {
@@ -278,6 +280,7 @@ pub extern "C" fn get_error_string(eh: *const ErrorHandle) -> *mut c_char {
 /// module-level HashMap, which will take O(n) with n the number of
 /// designations.
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn add_spec_to_session(
     name: *const c_char,
     spec: *const c_char,
@@ -320,6 +323,7 @@ pub extern "C" fn add_spec_to_session(
 
 /// Insert metadata into a session.
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn insert_metadata_in_session(
     sh: *const SessionHandle,
     bb: BoundingBox,
@@ -376,6 +380,7 @@ pub extern "C" fn insert_metadata_in_session(
 
 /// Get metadata overlapping a point
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn get_metadata_in_bb(
     sh: *const SessionHandle,
     bb: BoundingBox,
@@ -437,6 +442,7 @@ pub extern "C" fn get_metadata_in_bb(
 
 /// Print a session map
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn print_session(sh: *const SessionHandle) {
     unsafe {
         let map = SESSION_MAP.read().unwrap();
@@ -452,6 +458,7 @@ pub extern "C" fn print_session(sh: *const SessionHandle) {
 
 /// Print it all
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn print_the_mayhem() {
     println!("{:#?}", SESSION_MAP.read().unwrap());
 }
