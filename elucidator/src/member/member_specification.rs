@@ -24,10 +24,10 @@ impl std::fmt::Display for MemberSpecification {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let sizing_string = match self.sizing {
             Sizing::Singleton => {
-                format!("")
+                String::new()
             }
             Sizing::Dynamic => {
-                format!("[]")
+                "[]".to_string()
             }
             Sizing::Fixed(n) => {
                 format!("[{n}]")
@@ -35,37 +35,37 @@ impl std::fmt::Display for MemberSpecification {
         };
         let dtype_string = match self.dtype {
             Dtype::Byte => {
-                format!("u8")
+                "u8".to_string()
             }
             Dtype::UnsignedInteger16 => {
-                format!("u16")
+                "u16".to_string()
             }
             Dtype::UnsignedInteger32 => {
-                format!("u32")
+                "u32".to_string()
             }
             Dtype::UnsignedInteger64 => {
-                format!("u64")
+                "u64".to_string()
             }
             Dtype::SignedInteger8 => {
-                format!("i8")
+                "i8".to_string()
             }
             Dtype::SignedInteger16 => {
-                format!("i16")
+                "i16".to_string()
             }
             Dtype::SignedInteger32 => {
-                format!("i32")
+                "i32".to_string()
             }
             Dtype::SignedInteger64 => {
-                format!("i64")
+                "i64".to_string()
             }
             Dtype::Float32 => {
-                format!("f32")
+                "f32".to_string()
             }
             Dtype::Float64 => {
-                format!("f64")
+                "f64".to_string()
             }
             Dtype::Str => {
-                format!("string")
+                "string".to_string()
             }
         };
         let m = format!("{}: {dtype_string}{sizing_string}", self.identifier);

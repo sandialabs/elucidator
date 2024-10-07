@@ -375,7 +375,7 @@ impl Database for SqlDatabase {
                 _ => unreachable!("We should always retrieve blobs!"),
             };
             let d = self.designations.get(designation).unwrap();
-            data.push(d.interpret_enum(&buffer).unwrap());
+            data.push(d.interpret_enum(buffer).unwrap());
         }
         Ok(data)
     }
@@ -439,7 +439,7 @@ mod test {
 
     mod config {
         use super::*;
-        use pretty_assertions::assert_eq;
+        
 
         #[test]
         fn to_and_from_json_ok() {

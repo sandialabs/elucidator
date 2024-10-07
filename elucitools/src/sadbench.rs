@@ -2,13 +2,12 @@ use clap::Parser;
 use elucidator::representable::Representable;
 use elucidator_db::{
     backends::rtree::RTreeDatabase,
-    backends::sqlite::{SqlDatabase, SqliteConfig},
-    database::{Config, Database, DatabaseConfig, Metadata},
+    database::{Config, Database, Metadata},
 };
 use rand::random;
 use std::{
     fs::{File, OpenOptions},
-    io::{prelude::*, Write},
+    io::Write,
     path::Path,
     time::Instant,
 };
@@ -37,7 +36,7 @@ fn rand_pair() -> (f64, f64) {
     }
 }
 
-static designation: &'static str = "pdf";
+static designation: &str = "pdf";
 
 type Bb = (f64, f64, f64, f64, f64, f64, f64, f64);
 fn random_bb() -> Bb {
@@ -106,8 +105,8 @@ fn main() {
     if let Some(fname) = savename {
         let p = Path::new(&fname);
         let mut file = if !p.exists() {
-            let mut f = File::create(&p).unwrap();
-            write!(&mut f, "count,size,queries,insertion,query\n").unwrap();
+            let mut f = File::create(p).unwrap();
+            writeln!(&mut f, "count,size,queries,insertion,query").unwrap();
             f
         } else {
             OpenOptions::new().append(true).open(&fname).unwrap()

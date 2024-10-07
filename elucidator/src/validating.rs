@@ -274,8 +274,7 @@ mod tests {
             let ident = validating::validate_identifier(&ipo.identifier.unwrap());
             pretty_assertions::assert_eq!(
                 ident,
-                Err(InternalError::merge(&vec![
-                    InternalError::IllegalSpecification {
+                Err(InternalError::merge(&[InternalError::IllegalSpecification {
                         offender: TokenClone::new(ident_text.trim(), 0),
                         reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                     },
@@ -284,8 +283,7 @@ mod tests {
                         reason: SpecificationFailure::IllegalCharacters(vec![
                             test_utils::crab_emoji().chars().next().unwrap()
                         ]),
-                    },
-                ]))
+                    }]))
             );
         }
 
@@ -624,16 +622,14 @@ mod tests {
             let member = validating::validate_memberspec(&mpo);
             pretty_assertions::assert_eq!(
                 member,
-                Err(InternalError::merge(&vec![
-                    InternalError::IllegalSpecification {
+                Err(InternalError::merge(&[InternalError::IllegalSpecification {
                         offender: TokenClone::new("5eva", 0),
                         reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                     },
                     InternalError::IllegalSpecification {
                         offender: TokenClone::new("cat", 10),
                         reason: SpecificationFailure::IllegalArraySizing,
-                    },
-                ]))
+                    }]))
             );
         }
     }
@@ -682,8 +678,7 @@ mod tests {
             let spec = validating::validate_metadataspec(&mpo);
             pretty_assertions::assert_eq!(
                 spec,
-                Err(InternalError::merge(&vec![
-                    InternalError::IllegalSpecification {
+                Err(InternalError::merge(&[InternalError::IllegalSpecification {
                         offender: TokenClone {
                             data: "5ever".to_string(),
                             column_start: 0,
@@ -698,8 +693,7 @@ mod tests {
                             column_end: 26,
                         },
                         reason: SpecificationFailure::IllegalArraySizing,
-                    },
-                ])),
+                    }])),
             );
         }
 
@@ -734,8 +728,7 @@ mod tests {
             let spec = validating::validate_metadataspec(&mpo);
             pretty_assertions::assert_eq!(
                 spec,
-                Err(InternalError::merge(&vec![
-                    InternalError::IllegalSpecification {
+                Err(InternalError::merge(&[InternalError::IllegalSpecification {
                         offender: TokenClone::new("bar", 5),
                         reason: SpecificationFailure::IllegalDataType,
                     },
@@ -752,8 +745,7 @@ mod tests {
                                 column_end: 3,
                             },
                         }
-                    },
-                ]))
+                    }]))
             );
         }
     }

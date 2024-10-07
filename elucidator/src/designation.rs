@@ -213,7 +213,7 @@ fn get_array_from_buf(buffer: &mut Buffer, dt: &Dtype, items_to_read: usize) -> 
     match dt {
         Dtype::Byte => {
             let buf = &buffer.grab(u8::bytes_needed(items_to_read))?;
-            Ok(DataValue::ByteArray(u8::get_n_le(&buf, items_to_read)?))
+            Ok(DataValue::ByteArray(u8::get_n_le(buf, items_to_read)?))
         }
         Dtype::UnsignedInteger16 => {
             let buf = &buffer.grab(u16::bytes_needed(items_to_read))?;
@@ -846,7 +846,7 @@ mod test {
                 .map(|member| {
                     let dv = datum.get(member.identifier.as_str()).unwrap();
                     let sizing = &member.sizing;
-                    into_blob(&dv, sizing)
+                    into_blob(dv, sizing)
                 })
                 .collect();
             let buffer: Vec<u8> = blob_vec.iter().flat_map(|x| x.iter()).copied().collect();

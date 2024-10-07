@@ -109,7 +109,7 @@ impl Database for RTreeDatabase {
         let mut sqlite = SqlDatabase::new(Some(filename), None)?;
 
         for (designation, designation_spec) in self.designations.iter() {
-            sqlite.insert_spec_text(&designation, &designation_spec.to_string())?;
+            sqlite.insert_spec_text(designation, &designation_spec.to_string())?;
         }
         let md_results: Result<Vec<()>, crate::error::DatabaseError> = self
             .rtree
@@ -246,8 +246,8 @@ mod test {
     }
 
     mod config {
-        use super::*;
-        use pretty_assertions::assert_eq;
+        
+        
     }
 
     mod database {

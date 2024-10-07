@@ -1,6 +1,6 @@
 use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict};
 
-use elucidator::{designation::DesignationSpecification, error::ElucidatorError, value::DataValue};
+use elucidator::{error::ElucidatorError, value::DataValue};
 
 use elucidator_db::{
     backends::rtree::RTreeDatabase,
@@ -10,9 +10,9 @@ use elucidator_db::{
 
 use std::collections::HashMap;
 
-fn value2obj<'py, 'a>(
+fn value2obj<'py>(
     py: Python<'py>,
-    dv: &HashMap<&'a str, DataValue>,
+    dv: &HashMap<&str, DataValue>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let d = PyDict::new_bound(py);
 
@@ -49,11 +49,11 @@ enum ApiError {
     Database(DatabaseError),
 }
 
-impl Into<PyErr> for ApiError {
-    fn into(self) -> PyErr {
-        let msg = match &self {
-            Self::Eluci(e) => format!("ElucidatorError: {e}"),
-            Self::Database(e) => format!("DatabaseError: {e}"),
+impl From<ApiError> for PyErr {
+    fn from(val: ApiError) -> Self {
+        let msg = match &val {
+            ApiError::Eluci(e) => format!("ElucidatorError: {e}"),
+            ApiError::Database(e) => format!("DatabaseError: {e}"),
         };
         PyValueError::new_err(msg)
     }

@@ -1,12 +1,11 @@
 use elucidator::{designation::DesignationSpecification, error::ElucidatorError};
 
 use elucidator_db::{
-    backends::{rtree::RTreeDatabase, sqlite::SqlDatabase},
+    backends::rtree::RTreeDatabase,
     database::{Database, Metadata},
     error,
 };
 
-use libc;
 
 use std::{
     collections::HashMap,
@@ -304,9 +303,9 @@ pub extern "C" fn add_spec_to_session(
     };
     unsafe {
         let mut map = SESSION_MAP.write().unwrap();
-        let mut session = map.get_mut(&(*sh).clone()).unwrap();
+        let session = map.get_mut(&(*sh).clone()).unwrap();
         let hdl = unsafe { (*sh).clone() };
-        let mut session = match map.get_mut(&hdl) {
+        let session = match map.get_mut(&hdl) {
             Some(ses) => ses,
             None => {
                 let ehdl = ErrorHandle::get_new();
@@ -350,7 +349,7 @@ pub extern "C" fn insert_metadata_in_session(
     let designation = String::from_utf8_lossy(unsafe { CStr::from_ptr(designation) }.to_bytes());
     let mut map = SESSION_MAP.write().unwrap();
     let hdl = unsafe { (*sh).clone() };
-    let mut session = match map.get_mut(&hdl) {
+    let session = match map.get_mut(&hdl) {
         Some(ses) => ses,
         None => {
             let ehdl = ErrorHandle::get_new();
@@ -406,7 +405,7 @@ pub extern "C" fn get_metadata_in_bb(
     let designation = String::from_utf8_lossy(unsafe { CStr::from_ptr(designation) }.to_bytes());
     let mut map = SESSION_MAP.write().unwrap();
     let hdl = unsafe { (*sh).clone() };
-    let mut session = match map.get_mut(&hdl) {
+    let session = match map.get_mut(&hdl) {
         Some(ses) => ses,
         None => {
             let ehdl = ErrorHandle::get_new();
@@ -435,7 +434,7 @@ pub extern "C" fn get_metadata_in_bb(
     match &mut r {
         Ok(o) => {
             unsafe {
-                let mut bn = blobs_into_bufnode(o);
+                let bn = blobs_into_bufnode(o);
                 *results = bn;
             }
             ElucidatorStatus::ok()
@@ -459,7 +458,7 @@ pub extern "C" fn get_metadata_in_bb(
 pub extern "C" fn print_session(sh: *const SessionHandle) {
     unsafe {
         let map = SESSION_MAP.read().unwrap();
-        assert_eq!(1 as u32, 1 as u32);
+        assert_eq!(1_u32, 1_u32);
         assert_eq!(SessionHandle { hdl: 1 }, SessionHandle { hdl: 1 });
         let oops = SessionHandle { hdl: 1 };
         assert_eq!((*sh).id(), SessionHandle { hdl: 1 }.id());
