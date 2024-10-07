@@ -1,4 +1,4 @@
-use elucidator::{designation::DesignationSpecification, error::ElucidatorError};
+use elucidator::error::ElucidatorError;
 
 use elucidator_db::{
     backends::rtree::RTreeDatabase,
@@ -10,7 +10,7 @@ use std::{
     collections::HashMap,
     ffi::{CStr, CString},
     fmt,
-    hash::{Hash, Hasher},
+    hash::Hash,
     mem,
     os::raw::c_char,
     ptr, slice,
@@ -44,11 +44,6 @@ pub trait Handle: Hash {
 macro_rules! impl_handle {
     ($($tt:ty), *) => {
         $(
-            impl PartialEq for $tt {
-                fn eq(&self, other: &Self) -> bool {
-                    self.hdl == other.hdl
-                }
-            }
             impl Eq for $tt {}
             impl Handle for $tt {
                 fn get_new() -> Self {
@@ -65,7 +60,7 @@ macro_rules! impl_handle {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, PartialEq, Hash)]
 pub struct ErrorHandle {
     hdl: u32,
 }
@@ -73,7 +68,7 @@ pub struct ErrorHandle {
 impl_handle!(ErrorHandle);
 
 #[repr(C)]
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, PartialEq, Hash)]
 pub struct SessionHandle {
     hdl: u32,
 }
@@ -87,6 +82,7 @@ enum ApiError {
         id: u32,
         handle_type: String,
     },
+    #[allow(dead_code)]
     DesignationNotFound {
         session: u32,
         designation: String,
@@ -139,7 +135,7 @@ impl From<error::DatabaseError> for ApiError {
 
 fn not_found_from<T: Handle>(hdl: &T) -> ApiError {
     ApiError::HandleNotFound {
-        address: unsafe { format!("{:#?}", ptr::addr_of!(hdl)) },
+        address: format!("{:#?}", ptr::addr_of!(hdl)),
         id: hdl.id(),
         handle_type: T::htype(),
     }
@@ -290,47 +286,34 @@ pub extern "C" fn add_spec_to_session(
 ) -> ElucidatorStatus {
     let name = String::from_utf8_lossy(unsafe { CStr::from_ptr(name) }.to_bytes());
     let spec = String::from_utf8_lossy(unsafe { CStr::from_ptr(spec) }.to_bytes());
-    let designation = match DesignationSpecification::from_text(&spec) {
-        Ok(o) => o,
-        Err(e) => {
+    let mut map = SESSION_MAP.write().unwrap();
+    let hdl = unsafe { (*sh).clone() };
+    let session = match map.get_mut(&hdl) {
+        Some(ses) => ses,
+        None => {
+            let ehdl = ErrorHandle::get_new();
             unsafe {
-                *eh = ErrorHandle::get_new();
-                ERROR_MAP.write().unwrap().insert((*eh).clone(), e.into());
+                *eh = ehdl.clone();
             }
+            ERROR_MAP
+                .write()
+                .unwrap()
+                .insert(ehdl.clone(), not_found_from(&hdl));
             return ElucidatorStatus::err();
         }
     };
-    unsafe {
-        let mut map = SESSION_MAP.write().unwrap();
-        let session = map.get_mut(&(*sh).clone()).unwrap();
-        let hdl = unsafe { (*sh).clone() };
-        let session = match map.get_mut(&hdl) {
-            Some(ses) => ses,
-            None => {
-                let ehdl = ErrorHandle::get_new();
-                unsafe {
-                    *eh = ehdl.clone();
-                }
-                ERROR_MAP
-                    .write()
-                    .unwrap()
-                    .insert(ehdl.clone(), not_found_from(&hdl));
-                return ElucidatorStatus::err();
+    match &mut session.insert_spec_text(&name, &spec) {
+        Ok(_) => ElucidatorStatus::ok(),
+        Err(e) => {
+            let ehdl = ErrorHandle::get_new();
+            unsafe {
+                *eh = ehdl.clone();
             }
-        };
-        match &mut session.insert_spec_text(&name, &spec) {
-            Ok(_) => ElucidatorStatus::ok(),
-            Err(e) => {
-                let ehdl = ErrorHandle::get_new();
-                unsafe {
-                    *eh = ehdl.clone();
-                }
-                ERROR_MAP
-                    .write()
-                    .unwrap()
-                    .insert(ehdl.clone(), (*e).clone().into());
-                ElucidatorStatus::err()
-            }
+            ERROR_MAP
+                .write()
+                .unwrap()
+                .insert(ehdl.clone(), (*e).clone().into());
+            ElucidatorStatus::err()
         }
     }
 }
@@ -457,9 +440,6 @@ pub extern "C" fn get_metadata_in_bb(
 pub extern "C" fn print_session(sh: *const SessionHandle) {
     unsafe {
         let map = SESSION_MAP.read().unwrap();
-        assert_eq!(1_u32, 1_u32);
-        assert_eq!(SessionHandle { hdl: 1 }, SessionHandle { hdl: 1 });
-        let oops = SessionHandle { hdl: 1 };
         assert_eq!((*sh).id(), SessionHandle { hdl: 1 }.id());
         let ses = map.get(&(*sh));
         println!("{ses:#?}");

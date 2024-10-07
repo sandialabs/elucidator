@@ -2,7 +2,7 @@ use clap::Parser;
 use elucidator::representable::Representable;
 use elucidator_db::{
     backends::rtree::RTreeDatabase,
-    database::{Config, Database, Metadata},
+    database::{Database, Metadata},
 };
 use rand::random;
 use std::{
@@ -36,7 +36,7 @@ fn rand_pair() -> (f64, f64) {
     }
 }
 
-static designation: &str = "pdf";
+static DESIGNATION: &str = "pdf";
 
 type Bb = (f64, f64, f64, f64, f64, f64, f64, f64);
 fn random_bb() -> Bb {
@@ -62,7 +62,7 @@ fn metadata_from(buffer: &[u8]) -> Metadata {
         zmax,
         tmin,
         tmax,
-        designation,
+        designation: DESIGNATION,
         buffer,
     }
 }

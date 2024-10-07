@@ -42,6 +42,7 @@ fn value2obj<'py>(py: Python<'py>, dv: &HashMap<&str, DataValue>) -> PyResult<Bo
 }
 
 enum ApiError {
+    #[allow(dead_code)]
     Eluci(ElucidatorError),
     Database(DatabaseError),
 }
