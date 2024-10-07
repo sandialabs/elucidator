@@ -22,7 +22,7 @@ pub struct Metadata<'a> {
     pub buffer: &'a [u8],
 }
 
-pub trait Database {
+pub trait Database : Sync {
     fn new(filename: Option<&str>, config: Option<&DatabaseConfig>) -> Result<Self> where Self: Sized;
     fn from_path(filename: &str) -> Result<Self> where Self: Sized;
     fn save_as(&self, filename: &str) -> Result<()>;

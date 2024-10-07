@@ -377,6 +377,17 @@ impl DesignationSpecification {
         }
         Ok(map)
     }
+
+}
+
+impl std::fmt::Display for DesignationSpecification {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let m =self.members.iter()
+            .map(MemberSpecification::to_string)
+            .collect::<Vec<String>>()
+            .join(", ");
+        write!(f, "{m}")
+    }
 }
 
 #[cfg(test)]

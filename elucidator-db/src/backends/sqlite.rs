@@ -6,6 +6,7 @@ use elucidator::designation::DesignationSpecification;
 use crate::{
     database::{Database, DatabaseConfig, Datum, Metadata, Result, Config}, 
     error::DatabaseError,
+    backends::rtree::MetadataClone,
 };
 
 
@@ -14,10 +15,11 @@ use serde_json;
 
 use std::fs::File;
 use std::io::Write;
+use std::sync::{Arc, Mutex};
 
 pub struct SqlDatabase {
     /// Active database connection
-    conn: Connection,
+    conn: Arc<Mutex<Connection>>,
     /// Mapping of designations
     designations: HashMap<String, DesignationSpecification>,
     /// Extra configuration settings for the database
@@ -80,46 +82,47 @@ impl SqlDatabase {
     const MIN_VERSION: [u32; 3] = [3, 7, 0];
     fn initialize(&self) -> Result<()> {
         self.verify_version()?;
+        let conn = self.conn.lock()?;
         if self.config.use_wal {
-            self.conn.execute("PRAGMA journal_mode = WAL", [])?;
+            conn.execute("PRAGMA journal_mode = WAL", [])?;
         }
-        self.conn.execute(
+        conn.execute(
             &format!("PRAGMA page_size = {}", self.config.page_size), 
             []
         )?;
         if self.config.synchronous_off {
-            self.conn.execute("PRAGMA synchronous = OFF", [])?;
+            conn.execute("PRAGMA synchronous = OFF", [])?;
         }
         if self.config.use_memory_temp_store {
-            self.conn.execute("PRAGMA temp_store = MEMORY", [])?;
+            conn.execute("PRAGMA temp_store = MEMORY", [])?;
         }
         if self.config.threads > 0 {
-            self.conn.execute(
+            conn.execute(
                 &format!("PRAGMA threads = {}",
                 self.config.threads), []
             )?;
         }
         if self.config.cached_pages > 0 {
-            self.conn.execute(
+            conn.execute(
                 &format!("PRAGMA cache_size = {}",
                 self.config.cached_pages), []
             )?;
         }
-        self.conn.execute(
+        conn.execute(
             "CREATE TABLE designation_spec (
                 designation  TEXT NOT NULL PRIMARY KEY,
                 spec  TEXT NOT NULL
             )",
             (), // empty list of parameters.
         )?;
-        self.conn.execute(
+        conn.execute(
             "CREATE VIRTUAL TABLE MetadataLocations USING rtree(
                 id INTEGER PRIMARY KEY,
                 xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax
             )",
             (), // empty list of parameters.
         )?;
-        self.conn.execute(
+        conn.execute(
             "CREATE TABLE Metadata (
                 id INTEGER PRIMARY KEY,
                 designation TEXT,
@@ -127,11 +130,12 @@ impl SqlDatabase {
             )",
             []
         )?;
-        self.conn.execute("PRAGMA optimize", [])?;
+        conn.execute("PRAGMA optimize", [])?;
         Ok(())
     }
     fn verify_version(&self) -> Result<(), DatabaseError> {
-        let version = self.conn.query_row(
+        let conn = self.conn.lock()?;
+        let version = conn.query_row(
             "SELECT SQLITE_VERSION();", 
             [],
             |row| row.get::<usize, String>(0)
@@ -158,6 +162,50 @@ impl SqlDatabase {
         }
         Ok(())
     }
+    pub fn get_designations(&self) -> HashMap<String, DesignationSpecification> {
+        self.designations.clone()
+    }
+    pub fn get_all_metadata<'a>(&self) -> Result<Vec<MetadataClone>> {
+        let mut data = Vec::new();
+        let conn = self.conn.lock()?;
+        let mut stmt = conn.prepare_cached(
+            "SELECT 
+                ml.id, ml.xmin, ml.xmax, ml.ymin, ml.ymax, ml.zmin, ml.zmax, ml.tmin, ml.tmax,
+                m.designation, m.buffer
+            FROM 
+                Metadata AS m
+            JOIN 
+                MetadataLocations AS ml
+            ON 
+                ml.id = m.id
+            "
+        )?;
+        let mut rows = stmt.raw_query();
+        while let Some(row) = rows.next()? {
+            let xmin = row.get_ref(1)?.as_f64()?;
+            let xmax = row.get_ref(2)?.as_f64()?;
+            let ymin = row.get_ref(3)?.as_f64()?;
+            let ymax = row.get_ref(4)?.as_f64()?;
+            let zmin = row.get_ref(5)?.as_f64()?;
+            let zmax = row.get_ref(6)?.as_f64()?;
+            let tmin = row.get_ref(7)?.as_f64()?;
+            let tmax = row.get_ref(8)?.as_f64()?;
+            let designation = row.get_ref(9)?.as_str()?;
+            let buffer = match row.get_ref(10)? {
+                rusqlite::types::ValueRef::Blob(b) => b,
+                _ => unreachable!("We should always retrieve blobs!"),
+            };
+            data.push(MetadataClone {
+                xmin, xmax,
+                ymin, ymax,
+                zmin, zmax,
+                tmin, tmax,
+                designation: designation.to_string(),
+                buffer: buffer.into(),
+            });
+        }
+        Ok(data)
+    }
 }
 
 impl Database for SqlDatabase {
@@ -179,13 +227,13 @@ impl Database for SqlDatabase {
         };
         let db = if let Some(name) = filename {
             SqlDatabase {
-                conn: Connection::open(name)?,
+                conn: Arc::new(Mutex::new(Connection::open(name)?)),
                 designations: HashMap::new(),
                 config,
             }
         } else {
             SqlDatabase {
-                conn: Connection::open_in_memory()?,
+                conn: Arc::new(Mutex::new(Connection::open_in_memory()?)),
                 designations: HashMap::new(),
                 config,
             }
@@ -209,19 +257,21 @@ impl Database for SqlDatabase {
             }
         }
         Ok(SqlDatabase { 
-            conn,
+            conn: Arc::new(Mutex::new(conn)),
             designations,
             config: SqliteConfig::new(),
         })
     }
     fn save_as(&self, filename: &str) -> Result<()> {
-        self.conn.backup(rusqlite::DatabaseName::Main, filename, None)?;
+        let conn = self.conn.lock()?;
+        conn.backup(rusqlite::DatabaseName::Main, filename, None)?;
         Ok(())
     }
 
     fn insert_spec_text(&mut self, designation: &str, spec: &str) -> Result<()> {
         let designation_spec = DesignationSpecification::from_text(spec)?;
-        self.conn.execute(
+        let conn = self.conn.lock()?;
+        conn.execute(
             "INSERT INTO designation_spec (designation, spec) VALUES (?1, ?2)",
             (designation, spec),
         )?;
@@ -229,8 +279,8 @@ impl Database for SqlDatabase {
         Ok(())
     }
     fn insert_metadata(&mut self, datum: &Metadata) -> Result<()> {
-        let tx= self.conn.transaction()?;
-
+        let mut conn = self.conn.lock()?;
+        let tx = conn.transaction()?;
         {
             let mut stmt = tx.prepare_cached(
                 "INSERT INTO MetadataLocations (xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -249,7 +299,8 @@ impl Database for SqlDatabase {
         Ok(())
     }
     fn insert_n_metadata(&mut self, data: &Vec<Metadata>) -> Result<()> {
-        let tx= self.conn.transaction()?;
+        let mut conn = self.conn.lock()?;
+        let tx = conn.transaction()?;
 
         for datum in data {
             let mut stmt = tx.prepare_cached(
@@ -287,7 +338,8 @@ impl Database for SqlDatabase {
         let tmin = tmin - eps;
         let tmax = tmax + eps;
 
-        let mut stmt = self.conn.prepare_cached(
+        let conn = self.conn.lock()?;
+        let mut stmt = conn.prepare_cached(
             "SELECT 
                 ml.id, ml.xmin, ml.xmax, ml.ymin, ml.ymax, ml.zmin, ml.zmax, ml.tmin, ml.tmax,
                 m.designation, m.buffer
@@ -331,15 +383,17 @@ impl Database for SqlDatabase {
 
     fn get_metadata_blobs_in_bb(
         &self,
-        xmin: f64, xmax: f64,
-        ymin: f64, ymax: f64,
-        zmin: f64, zmax: f64,
-        tmin: f64, tmax: f64,
-        designation: &str,
-        epsilon: Option<f64>,
+        _xmin: f64, _xmax: f64,
+        _ymin: f64, _ymax: f64,
+        _zmin: f64, _zmax: f64,
+        _tmin: f64, _tmax: f64,
+        _designation: &str,
+        _epsilon: Option<f64>,
     ) -> Result<Vec<&Vec<u8>>> {
         todo!();
     }
+
+
 }
 
 
