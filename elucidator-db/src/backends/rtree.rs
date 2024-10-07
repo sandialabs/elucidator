@@ -143,7 +143,7 @@ impl Database for RTreeDatabase {
         self.rtree.insert(datum.into());
         Ok(())
     }
-    fn insert_n_metadata(&mut self, data: &Vec<Metadata>) -> Result<()> {
+    fn insert_n_metadata(&mut self, data: &[Metadata]) -> Result<()> {
         for datum in data {
             self.rtree.insert(datum.into());
         }

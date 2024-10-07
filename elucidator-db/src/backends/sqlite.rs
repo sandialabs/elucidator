@@ -290,7 +290,7 @@ impl Database for SqlDatabase {
 
         Ok(())
     }
-    fn insert_n_metadata(&mut self, data: &Vec<Metadata>) -> Result<()> {
+    fn insert_n_metadata(&mut self, data: &[Metadata]) -> Result<()> {
         let mut conn = self.conn.lock()?;
         let tx = conn.transaction()?;
 

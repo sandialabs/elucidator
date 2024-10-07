@@ -31,7 +31,7 @@ pub trait Database: Sync {
     fn save_as(&self, filename: &str) -> Result<()>;
     fn insert_spec_text(&mut self, designation: &str, spec: &str) -> Result<()>;
     fn insert_metadata(&mut self, datum: &Metadata) -> Result<()>;
-    fn insert_n_metadata(&mut self, data: &Vec<Metadata>) -> Result<()>;
+    fn insert_n_metadata(&mut self, data: &[Metadata]) -> Result<()>;
     fn get_metadata_in_bb(
         &self,
         xmin: f64,
