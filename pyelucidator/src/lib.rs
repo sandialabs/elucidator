@@ -10,10 +10,7 @@ use elucidator_db::{
 
 use std::collections::HashMap;
 
-fn value2obj<'py>(
-    py: Python<'py>,
-    dv: &HashMap<&str, DataValue>,
-) -> PyResult<Bound<'py, PyDict>> {
+fn value2obj<'py>(py: Python<'py>, dv: &HashMap<&str, DataValue>) -> PyResult<Bound<'py, PyDict>> {
     let d = PyDict::new_bound(py);
 
     for (k, v) in dv {

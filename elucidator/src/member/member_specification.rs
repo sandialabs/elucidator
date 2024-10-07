@@ -23,50 +23,24 @@ impl MemberSpecification {
 impl std::fmt::Display for MemberSpecification {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let sizing_string = match self.sizing {
-            Sizing::Singleton => {
-                String::new()
-            }
-            Sizing::Dynamic => {
-                "[]".to_string()
-            }
+            Sizing::Singleton => String::new(),
+            Sizing::Dynamic => "[]".to_string(),
             Sizing::Fixed(n) => {
                 format!("[{n}]")
             }
         };
         let dtype_string = match self.dtype {
-            Dtype::Byte => {
-                "u8".to_string()
-            }
-            Dtype::UnsignedInteger16 => {
-                "u16".to_string()
-            }
-            Dtype::UnsignedInteger32 => {
-                "u32".to_string()
-            }
-            Dtype::UnsignedInteger64 => {
-                "u64".to_string()
-            }
-            Dtype::SignedInteger8 => {
-                "i8".to_string()
-            }
-            Dtype::SignedInteger16 => {
-                "i16".to_string()
-            }
-            Dtype::SignedInteger32 => {
-                "i32".to_string()
-            }
-            Dtype::SignedInteger64 => {
-                "i64".to_string()
-            }
-            Dtype::Float32 => {
-                "f32".to_string()
-            }
-            Dtype::Float64 => {
-                "f64".to_string()
-            }
-            Dtype::Str => {
-                "string".to_string()
-            }
+            Dtype::Byte => "u8".to_string(),
+            Dtype::UnsignedInteger16 => "u16".to_string(),
+            Dtype::UnsignedInteger32 => "u32".to_string(),
+            Dtype::UnsignedInteger64 => "u64".to_string(),
+            Dtype::SignedInteger8 => "i8".to_string(),
+            Dtype::SignedInteger16 => "i16".to_string(),
+            Dtype::SignedInteger32 => "i32".to_string(),
+            Dtype::SignedInteger64 => "i64".to_string(),
+            Dtype::Float32 => "f32".to_string(),
+            Dtype::Float64 => "f64".to_string(),
+            Dtype::Str => "string".to_string(),
         };
         let m = format!("{}: {dtype_string}{sizing_string}", self.identifier);
         write!(f, "{m}")

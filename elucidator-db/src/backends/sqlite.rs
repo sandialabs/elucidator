@@ -439,7 +439,6 @@ mod test {
 
     mod config {
         use super::*;
-        
 
         #[test]
         fn to_and_from_json_ok() {

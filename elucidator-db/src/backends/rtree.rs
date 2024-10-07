@@ -245,10 +245,7 @@ mod test {
             .collect()
     }
 
-    mod config {
-        
-        
-    }
+    mod config {}
 
     mod database {
         use super::*;

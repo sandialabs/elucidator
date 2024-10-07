@@ -6,7 +6,6 @@ use elucidator_db::{
     error,
 };
 
-
 use std::{
     collections::HashMap,
     ffi::{CStr, CString},
