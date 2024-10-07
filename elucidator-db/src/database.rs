@@ -32,6 +32,7 @@ pub trait Database: Sync {
     fn insert_spec_text(&mut self, designation: &str, spec: &str) -> Result<()>;
     fn insert_metadata(&mut self, datum: &Metadata) -> Result<()>;
     fn insert_n_metadata(&mut self, data: &[Metadata]) -> Result<()>;
+    #[allow(clippy::too_many_arguments)]
     fn get_metadata_in_bb(
         &self,
         xmin: f64,
@@ -45,6 +46,7 @@ pub trait Database: Sync {
         designation: &str,
         epsilon: Option<f64>,
     ) -> Result<Vec<Datum>>;
+    #[allow(clippy::too_many_arguments)]
     fn get_metadata_blobs_in_bb(
         &self,
         xmin: f64,
