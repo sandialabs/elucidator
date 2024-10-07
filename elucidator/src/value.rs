@@ -1,7 +1,4 @@
-use crate::{
-    error::ElucidatorError,
-    representable::Representable,
-};
+use crate::{error::ElucidatorError, representable::Representable};
 
 type Result<T, E = ElucidatorError> = std::result::Result<T, E>;
 
@@ -34,27 +31,27 @@ pub enum DataValue {
 impl DataValue {
     pub fn as_buffer(&self) -> Vec<u8> {
         match self {
-            Self::Byte(v) => { v.to_le_bytes().to_vec() },
-            Self::UnsignedInteger16(v) => { v.to_le_bytes().to_vec() },
-            Self::UnsignedInteger32(v) => { v.to_le_bytes().to_vec() },
-            Self::UnsignedInteger64(v) => { v.to_le_bytes().to_vec() },
-            Self::SignedInteger8(v) => { v.to_le_bytes().to_vec() },
-            Self::SignedInteger16(v) => { v.to_le_bytes().to_vec() },
-            Self::SignedInteger32(v) => { v.to_le_bytes().to_vec() },
-            Self::SignedInteger64(v) => { v.to_le_bytes().to_vec() },
-            Self::Float32(v) => { v.to_le_bytes().to_vec() },
-            Self::Float64(v) => { v.to_le_bytes().to_vec() },
-            Self::Str(s) => { s.as_buffer() },
-            Self::ByteArray(v) => { v.as_buffer() },
-            Self::UnsignedInteger16Array(v) => { v.as_buffer() },
-            Self::UnsignedInteger32Array(v) => { v.as_buffer() },
-            Self::UnsignedInteger64Array(v) => { v.as_buffer() },
-            Self::SignedInteger8Array(v) => { v.as_buffer() },
-            Self::SignedInteger16Array(v) => { v.as_buffer() },
-            Self::SignedInteger32Array(v) => { v.as_buffer() },
-            Self::SignedInteger64Array(v) => { v.as_buffer() },
-            Self::Float32Array(v) => { v.as_buffer() },
-            Self::Float64Array(v) => { v.as_buffer() },
+            Self::Byte(v) => v.to_le_bytes().to_vec(),
+            Self::UnsignedInteger16(v) => v.to_le_bytes().to_vec(),
+            Self::UnsignedInteger32(v) => v.to_le_bytes().to_vec(),
+            Self::UnsignedInteger64(v) => v.to_le_bytes().to_vec(),
+            Self::SignedInteger8(v) => v.to_le_bytes().to_vec(),
+            Self::SignedInteger16(v) => v.to_le_bytes().to_vec(),
+            Self::SignedInteger32(v) => v.to_le_bytes().to_vec(),
+            Self::SignedInteger64(v) => v.to_le_bytes().to_vec(),
+            Self::Float32(v) => v.to_le_bytes().to_vec(),
+            Self::Float64(v) => v.to_le_bytes().to_vec(),
+            Self::Str(s) => s.as_buffer(),
+            Self::ByteArray(v) => v.as_buffer(),
+            Self::UnsignedInteger16Array(v) => v.as_buffer(),
+            Self::UnsignedInteger32Array(v) => v.as_buffer(),
+            Self::UnsignedInteger64Array(v) => v.as_buffer(),
+            Self::SignedInteger8Array(v) => v.as_buffer(),
+            Self::SignedInteger16Array(v) => v.as_buffer(),
+            Self::SignedInteger32Array(v) => v.as_buffer(),
+            Self::SignedInteger64Array(v) => v.as_buffer(),
+            Self::Float32Array(v) => v.as_buffer(),
+            Self::Float64Array(v) => v.as_buffer(),
         }
     }
 }
@@ -94,7 +91,7 @@ macro_rules! impl_le_bufread {
                     } else {
                         Ok(buf[..expected_bytes]
                             .chunks_exact(std::mem::size_of::<$tt>())
-                            .map(|x| 
+                            .map(|x|
                                 <$tt>::from_le_bytes(x.try_into().unwrap())
                             )
                             .collect()
@@ -109,14 +106,14 @@ macro_rules! impl_le_bufread {
     };
 }
 
-impl_le_bufread!{u8, u16, u32, u64, i8, i16, i32, i64, f32, f64}
+impl_le_bufread! {u8, u16, u32, u64, i8, i16, i32, i64, f32, f64}
 
 impl LeBufferRead for String {
     fn get_one_le(buf: &[u8]) -> Result<Self> {
         if buf.len() != 8 {
-            Err(ElucidatorError::BufferSizing{
+            Err(ElucidatorError::BufferSizing {
                 expected: 8,
-                found: buf.len()
+                found: buf.len(),
             })?
         }
         let n_bytes = u64::from_le_bytes(buf[0..8].try_into().unwrap());
@@ -126,7 +123,7 @@ impl LeBufferRead for String {
             let databuf = &buf[8..];
             match String::from_utf8(databuf.to_vec()) {
                 Ok(o) => Ok(o),
-                Err(e) => Err(ElucidatorError::FromUtf8{ source: e }),
+                Err(e) => Err(ElucidatorError::FromUtf8 { source: e }),
             }
         }
     }
@@ -141,8 +138,8 @@ impl LeBufferRead for String {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand::random;
     use pretty_assertions;
+    use rand::random;
 
     macro_rules! singleton_round_trip {
         ($($tt:ty), *) => {
@@ -178,7 +175,6 @@ mod test {
             )*
         }
     }
-
 
     #[test]
     fn test_singleton_round_trips() {

@@ -1,6 +1,6 @@
 extern crate proc_macro;
+use proc_macro::TokenStream;
 use std::fmt;
-use proc_macro::{TokenStream};
 
 use quote::{quote, ToTokens};
 use syn::*;
@@ -46,8 +46,7 @@ fn attempt_convert(source: &str, target: &str) -> String {
 
     let return_value = if source == target {
         "Ok(*self)".to_string()
-    } else if
-        (source.is_signed() && !target.is_signed())
+    } else if (source.is_signed() && !target.is_signed())
         || (source.is_float() && !target.is_float())
         || (source.size > target.size)
     {
@@ -85,13 +84,16 @@ fn attempt_convert(source: &str, target: &str) -> String {
 fn attempt_convert_vec(source: &str, target: &str) -> String {
     let source = Primitive::from(source);
     let target = Primitive::from(target);
-    let narrow = format!("crate::ElucidatorError::new_narrowing(\"{source} array\", \"{target} array\")");
-    let ok = format!("Ok(self.iter().map(|x| *x as {}).collect())", target.as_string());
+    let narrow =
+        format!("crate::ElucidatorError::new_narrowing(\"{source} array\", \"{target} array\")");
+    let ok = format!(
+        "Ok(self.iter().map(|x| *x as {}).collect())",
+        target.as_string()
+    );
 
     let return_value = if source == target {
         "Ok(self.to_vec())".to_string()
-    } else if
-        (source.is_signed() && !target.is_signed())
+    } else if (source.is_signed() && !target.is_signed())
         || (source.is_float() && !target.is_float())
         || (source.size > target.size)
     {
@@ -125,13 +127,14 @@ fn attempt_convert_vec(source: &str, target: &str) -> String {
     format!("fn as_vec_{}(&self) -> std::result::Result<std::vec::Vec<std::primitive::{}>, crate::ElucidatorError> {{ {return_value} }}", target, target)
 }
 
-
 #[proc_macro]
 pub fn representable_primitive_impl(item: TokenStream) -> TokenStream {
     let t: Type = syn::parse(item).unwrap();
     let in_path = match &t {
         Type::Path(tp) => tp,
-        _ => {panic!("make_representable_impl must be a valid path")}
+        _ => {
+            panic!("make_representable_impl must be a valid path")
+        }
     };
     let last_ident = &in_path.path.segments.iter().last().unwrap().ident;
     // println!("{last_ident:#?}");
@@ -154,16 +157,23 @@ pub fn representable_primitive_impl(item: TokenStream) -> TokenStream {
         "i64" => quote! { Dtype::SignedInteger64 },
         "f32" => quote! { Dtype::Float32 },
         "f64" => quote! { Dtype::Float64 },
-        _ => { todo!("Need to add get_dtype_return for {}", string_repr)}
-    }.to_token_stream();
+        _ => {
+            todo!("Need to add get_dtype_return for {}", string_repr)
+        }
+    }
+    .to_token_stream();
 
     let buffer_conversion = quote! {
         self.to_le_bytes().iter().map(|x| *x).collect()
-    }.to_token_stream();
+    }
+    .to_token_stream();
 
     // Logic for conversions
-    let target_types = ["u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "f32", "f64"];
-    let conversion_text = target_types.iter()
+    let target_types = [
+        "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "f32", "f64",
+    ];
+    let conversion_text = target_types
+        .iter()
         .map(|x| attempt_convert(this_primitive.as_string().as_str(), x))
         .collect::<Vec<String>>()
         .join("\n");
@@ -202,7 +212,9 @@ pub fn representable_vec_impl(item: TokenStream) -> TokenStream {
     let t: Type = syn::parse(item).unwrap();
     let in_path = match &t {
         Type::Path(tp) => tp,
-        _ => {panic!("make_representable_impl must be a valid path")}
+        _ => {
+            panic!("make_representable_impl must be a valid path")
+        }
     };
     let last_ident = &in_path.path.segments.iter().last().unwrap().ident;
     // println!("{last_ident:#?}");
@@ -227,8 +239,11 @@ pub fn representable_vec_impl(item: TokenStream) -> TokenStream {
         "i64" => quote! { Dtype::SignedInteger64 },
         "f32" => quote! { Dtype::Float32 },
         "f64" => quote! { Dtype::Float64 },
-        _ => { todo!("Need to add get_dtype_return for {}", string_repr)}
-    }.to_token_stream();
+        _ => {
+            todo!("Need to add get_dtype_return for {}", string_repr)
+        }
+    }
+    .to_token_stream();
 
     let buffer_conversion = quote! {
         let length = self.len() * std::mem::size_of::<#last_ident>();
@@ -238,20 +253,27 @@ pub fn representable_vec_impl(item: TokenStream) -> TokenStream {
             buffer.append(&mut item_buffer);
         }
         buffer
-    }.to_token_stream();
+    }
+    .to_token_stream();
 
     // Logic for conversions
-    let target_types = ["u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "f32", "f64"];
-    let conversion_text = target_types.iter()
-    .map(|x| format!(
+    let target_types = [
+        "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "f32", "f64",
+    ];
+    let conversion_text = target_types
+        .iter()
+        .map(|x| {
+            format!(
         "fn as_{x}(&self) -> std::result::Result<std::primitive::{x}, crate::ElucidatorError> {{
            crate::ElucidatorError::new_conversion(\"{string_repr} array\", \"{x}\")
         }}\n"
-    ))
-    .collect::<Vec<String>>()
-    .join("\n");
+    )
+        })
+        .collect::<Vec<String>>()
+        .join("\n");
     let conversion_functions: proc_macro2::TokenStream = conversion_text.parse().unwrap();
-    let vec_conversion_text = target_types.iter()
+    let vec_conversion_text = target_types
+        .iter()
         .map(|x| attempt_convert_vec(this_primitive.as_string().as_str(), x))
         .collect::<Vec<String>>()
         .join("\n");
@@ -281,7 +303,9 @@ pub fn make_dtype_interpreter(item: TokenStream) -> TokenStream {
     let t: Type = syn::parse(item).unwrap();
     let in_path = match &t {
         Type::Path(tp) => tp,
-        _ => {panic!("make_representable_impl must be a valid path")}
+        _ => {
+            panic!("make_representable_impl must be a valid path")
+        }
     };
     let last_ident = &in_path.path.segments.iter().last().unwrap().ident;
     let signature: proc_macro2::TokenStream = format!(
@@ -291,12 +315,14 @@ pub fn make_dtype_interpreter(item: TokenStream) -> TokenStream {
             sizing: &Sizing,
         ) -> Result<Box<dyn Representable>>
         "
-    ).parse().unwrap();
+    )
+    .parse()
+    .unwrap();
 
     let buffer_conversion = quote! {
         #signature {
             let item_width = std::mem::size_of::<#last_ident>();
-            let bytes_to_read = items_to_read * item_width; 
+            let bytes_to_read = items_to_read * item_width;
             let mut result_buffer: std::vec::Vec<u8> = std::vec::Vec::with_capacity(bytes_to_read);
             get_n_bytes_from_buff(cursor, &mut result_buffer, bytes_to_read)?;
             let mut item_buff: std::vec::Vec<std::primitive::u8> = std::vec::Vec::with_capacity(std::mem::size_of::<#last_ident>());
@@ -309,7 +335,7 @@ pub fn make_dtype_interpreter(item: TokenStream) -> TokenStream {
             }
             if sizing == &Sizing::Singleton {
                 return Ok(std::boxed::Box::new(result[0]));
-            } 
+            }
             Ok(std::boxed::Box::new(result))
         }
     }.to_token_stream();

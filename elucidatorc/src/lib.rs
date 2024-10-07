@@ -1,40 +1,30 @@
-use elucidator::{
-    designation::DesignationSpecification,
-    error::ElucidatorError,
-};
+use elucidator::error::ElucidatorError;
 
 use elucidator_db::{
-    error,
-    backends::{sqlite::SqlDatabase, rtree::RTreeDatabase},
+    backends::rtree::RTreeDatabase,
     database::{Database, Metadata},
+    error,
 };
-
-use libc;
 
 use std::{
     collections::HashMap,
-    hash::{Hash, Hasher},
     ffi::{CStr, CString},
     fmt,
+    hash::Hash,
     mem,
     os::raw::c_char,
-    ptr,
-    slice,
+    ptr, slice,
     sync::{
         atomic::{AtomicU32, Ordering},
-        LazyLock, RwLock
+        LazyLock, RwLock,
     },
 };
 
 type Emap = LazyLock<RwLock<HashMap<ErrorHandle, ApiError>>>;
-static ERROR_MAP: Emap = LazyLock::new(|| {
-    RwLock::new(HashMap::new())
-});
+static ERROR_MAP: Emap = LazyLock::new(|| RwLock::new(HashMap::new()));
 
 type Smap = LazyLock<RwLock<HashMap<SessionHandle, RTreeDatabase>>>;
-static SESSION_MAP: Smap = LazyLock::new(|| {
-    RwLock::new(HashMap::new())
-});
+static SESSION_MAP: Smap = LazyLock::new(|| RwLock::new(HashMap::new()));
 
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq)]
@@ -45,7 +35,7 @@ pub enum DatabaseKind {
 
 static HANDLE_NUM: AtomicU32 = AtomicU32::new(1);
 
-pub trait Handle: Hash { 
+pub trait Handle: Hash {
     fn get_new() -> Self;
     fn id(&self) -> u32;
     fn htype() -> String;
@@ -54,11 +44,6 @@ pub trait Handle: Hash {
 macro_rules! impl_handle {
     ($($tt:ty), *) => {
         $(
-            impl PartialEq for $tt {
-                fn eq(&self, other: &Self) -> bool {
-                    self.hdl == other.hdl
-                }
-            }
             impl Eq for $tt {}
             impl Handle for $tt {
                 fn get_new() -> Self {
@@ -75,25 +60,33 @@ macro_rules! impl_handle {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, PartialEq, Hash)]
 pub struct ErrorHandle {
-    hdl: u32
+    hdl: u32,
 }
 
 impl_handle!(ErrorHandle);
 
 #[repr(C)]
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, PartialEq, Hash)]
 pub struct SessionHandle {
-    hdl: u32
+    hdl: u32,
 }
 
 #[derive(Debug)]
 enum ApiError {
     Eluci(ElucidatorError),
     Database(error::DatabaseError),
-    HandleNotFound{address: String, id: u32, handle_type: String},
-    DesignationNotFound{session: u32, designation: String},
+    HandleNotFound {
+        address: String,
+        id: u32,
+        handle_type: String,
+    },
+    #[allow(dead_code)]
+    DesignationNotFound {
+        session: u32,
+        designation: String,
+    },
 }
 
 impl fmt::Display for ApiError {
@@ -101,16 +94,29 @@ impl fmt::Display for ApiError {
         match self {
             Self::Eluci(e) => {
                 write!(f, "ElucidatorError: {e}")
-            },
+            }
             Self::Database(e) => {
                 write!(f, "Elucidator Database Error: {e}")
-            },
-            Self::HandleNotFound{address, id, handle_type} => {
-                write!(f, "Handle {id} not found: type {handle_type} at address {address}")
-            },
-            Self::DesignationNotFound{session, designation} => {
-                write!(f, "Cannot find designation {designation} in session {session}")
-            },
+            }
+            Self::HandleNotFound {
+                address,
+                id,
+                handle_type,
+            } => {
+                write!(
+                    f,
+                    "Handle {id} not found: type {handle_type} at address {address}"
+                )
+            }
+            Self::DesignationNotFound {
+                session,
+                designation,
+            } => {
+                write!(
+                    f,
+                    "Cannot find designation {designation} in session {session}"
+                )
+            }
         }
     }
 }
@@ -129,13 +135,11 @@ impl From<error::DatabaseError> for ApiError {
 
 fn not_found_from<T: Handle>(hdl: &T) -> ApiError {
     ApiError::HandleNotFound {
-        address: unsafe { format!("{:#?}", ptr::addr_of!(hdl)) },
+        address: format!("{:#?}", ptr::addr_of!(hdl)),
         id: hdl.id(),
         handle_type: T::htype(),
     }
 }
-
-
 
 impl_handle!(SessionHandle);
 
@@ -148,8 +152,12 @@ pub enum ElucidatorStatus {
 }
 
 impl ElucidatorStatus {
-    pub fn ok() -> Self { Self::ELUCIDATOR_OK }
-    pub fn err() -> Self { Self::ELUCIDATOR_ERROR }
+    pub fn ok() -> Self {
+        Self::ELUCIDATOR_OK
+    }
+    pub fn err() -> Self {
+        Self::ELUCIDATOR_ERROR
+    }
 }
 
 #[repr(C)]
@@ -187,7 +195,7 @@ impl BufNode {
         let n = 0;
         let next = ptr::null_mut::<BufNode>();
         let ptr = libc::malloc(mem::size_of::<Self>()) as *mut BufNode;
-        *ptr = BufNode { p, n, next};
+        *ptr = BufNode { p, n, next };
         ptr
     }
 }
@@ -229,9 +237,7 @@ pub extern "C" fn fetch_sample_blob() -> *mut BufNode {
     let c = vec![0, 27, 6];
 
     let mut sample: Vec<&Vec<u8>> = vec![&a, &b, &c];
-    unsafe {
-        blobs_into_bufnode(&mut sample)
-    }
+    unsafe { blobs_into_bufnode(&mut sample) }
 }
 
 /// Instantiate a new Elucidator session. Individual sessions will have
@@ -239,6 +245,7 @@ pub extern "C" fn fetch_sample_blob() -> *mut BufNode {
 /// return status. If the status is not ELUCIDATOR_OK, an error has occurred
 /// and the value of the passed pointer has not been updated.
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn new_session(sh: *mut SessionHandle, _kind: DatabaseKind) -> ElucidatorStatus {
     let rdb = match RTreeDatabase::new(None, None) {
         Ok(o) => o,
@@ -247,8 +254,7 @@ pub extern "C" fn new_session(sh: *mut SessionHandle, _kind: DatabaseKind) -> El
         }
     };
     let hdl = SessionHandle::get_new();
-    SESSION_MAP.write().unwrap()
-        .insert(hdl.clone(), rdb);
+    SESSION_MAP.write().unwrap().insert(hdl.clone(), rdb);
     unsafe {
         *sh = hdl;
     }
@@ -258,12 +264,11 @@ pub extern "C" fn new_session(sh: *mut SessionHandle, _kind: DatabaseKind) -> El
 /// Get a string based on the provided handle. If the handle cannot be foundor is NULL, the
 /// returned string will be NULL. You must free the returned pointer.
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn get_error_string(eh: *const ErrorHandle) -> *mut c_char {
     unsafe {
         match ERROR_MAP.read().unwrap().get(&*eh) {
-            Some(e) => {
-                CString::new(format!("{e}").as_str()).unwrap().into_raw()
-            },
+            Some(e) => CString::new(format!("{e}").as_str()).unwrap().into_raw(),
             None => ptr::null_mut::<c_char>(),
         }
     }
@@ -275,64 +280,50 @@ pub extern "C" fn get_error_string(eh: *const ErrorHandle) -> *mut c_char {
 /// module-level HashMap, which will take O(n) with n the number of
 /// designations.
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn add_spec_to_session(
     name: *const c_char,
     spec: *const c_char,
     sh: *const SessionHandle,
     eh: *mut ErrorHandle,
 ) -> ElucidatorStatus {
-    let name = String::from_utf8_lossy(
-        unsafe { CStr::from_ptr(name) }.to_bytes()
-    );
-    let spec = String::from_utf8_lossy(
-        unsafe { CStr::from_ptr(spec) }.to_bytes()
-    );
-    let designation = match DesignationSpecification::from_text(&spec) {
-        Ok(o) => o,
-        Err(e) => {
+    let name = String::from_utf8_lossy(unsafe { CStr::from_ptr(name) }.to_bytes());
+    let spec = String::from_utf8_lossy(unsafe { CStr::from_ptr(spec) }.to_bytes());
+    let mut map = SESSION_MAP.write().unwrap();
+    let hdl = unsafe { (*sh).clone() };
+    let session = match map.get_mut(&hdl) {
+        Some(ses) => ses,
+        None => {
+            let ehdl = ErrorHandle::get_new();
             unsafe {
-                *eh = ErrorHandle::get_new();
-                ERROR_MAP.write().unwrap().insert((*eh).clone(), e.into());
+                *eh = ehdl.clone();
             }
+            ERROR_MAP
+                .write()
+                .unwrap()
+                .insert(ehdl.clone(), not_found_from(&hdl));
             return ElucidatorStatus::err();
-        },
+        }
     };
-    unsafe {
-        let mut map = SESSION_MAP.write().unwrap();
-        let mut session = map.get_mut(&(*sh).clone()).unwrap();
-        let hdl = unsafe { (*sh).clone() };
-        let mut session = match map.get_mut(&hdl) {
-            Some(ses) => ses,
-            None => {
-                let ehdl = ErrorHandle::get_new();
-                unsafe {
-                    *eh = ehdl.clone();
-                }
-                ERROR_MAP.write().unwrap()
-                    .insert(
-                        ehdl.clone(),
-                        not_found_from(&hdl)
-                    );
-                return ElucidatorStatus::err();
+    match &mut session.insert_spec_text(&name, &spec) {
+        Ok(_) => ElucidatorStatus::ok(),
+        Err(e) => {
+            let ehdl = ErrorHandle::get_new();
+            unsafe {
+                *eh = ehdl.clone();
             }
-        };
-        match &mut session.insert_spec_text(&name, &spec) {
-            Ok(_) => ElucidatorStatus::ok(),
-            Err(e) => {
-                let ehdl = ErrorHandle::get_new();
-                unsafe {
-                    *eh = ehdl.clone();
-                }
-                ERROR_MAP.write().unwrap()
-                    .insert(ehdl.clone(), (*e).clone().into());
-                ElucidatorStatus::err()
-            },
+            ERROR_MAP
+                .write()
+                .unwrap()
+                .insert(ehdl.clone(), (*e).clone().into());
+            ElucidatorStatus::err()
         }
     }
 }
 
 /// Insert metadata into a session.
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn insert_metadata_in_session(
     sh: *const SessionHandle,
     bb: BoundingBox,
@@ -341,23 +332,20 @@ pub extern "C" fn insert_metadata_in_session(
     n_bytes: usize,
     eh: *mut ErrorHandle,
 ) -> ElucidatorStatus {
-    let designation = String::from_utf8_lossy(
-        unsafe { CStr::from_ptr(designation) }.to_bytes()
-    );
+    let designation = String::from_utf8_lossy(unsafe { CStr::from_ptr(designation) }.to_bytes());
     let mut map = SESSION_MAP.write().unwrap();
     let hdl = unsafe { (*sh).clone() };
-    let mut session = match map.get_mut(&hdl) {
+    let session = match map.get_mut(&hdl) {
         Some(ses) => ses,
         None => {
             let ehdl = ErrorHandle::get_new();
             unsafe {
                 *eh = ehdl.clone();
             }
-            ERROR_MAP.write().unwrap()
-                .insert(
-                    ehdl.clone(),
-                    not_found_from(&hdl)
-                );
+            ERROR_MAP
+                .write()
+                .unwrap()
+                .insert(ehdl.clone(), not_found_from(&hdl));
             return ElucidatorStatus::err();
         }
     };
@@ -381,18 +369,18 @@ pub extern "C" fn insert_metadata_in_session(
             unsafe {
                 *eh = ehdl.clone();
             }
-            ERROR_MAP.write().unwrap()
-                .insert(
-                    ehdl.clone(),
-                    ApiError::Database(e.clone()),
-                );
+            ERROR_MAP
+                .write()
+                .unwrap()
+                .insert(ehdl.clone(), ApiError::Database(e.clone()));
             ElucidatorStatus::err()
-        },
+        }
     }
 }
 
 /// Get metadata overlapping a point
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn get_metadata_in_bb(
     sh: *const SessionHandle,
     bb: BoundingBox,
@@ -401,23 +389,20 @@ pub extern "C" fn get_metadata_in_bb(
     results: *mut *mut BufNode,
     eh: *mut ErrorHandle,
 ) -> ElucidatorStatus {
-    let designation = String::from_utf8_lossy(
-        unsafe { CStr::from_ptr(designation) }.to_bytes()
-    );
+    let designation = String::from_utf8_lossy(unsafe { CStr::from_ptr(designation) }.to_bytes());
     let mut map = SESSION_MAP.write().unwrap();
     let hdl = unsafe { (*sh).clone() };
-    let mut session = match map.get_mut(&hdl) {
+    let session = match map.get_mut(&hdl) {
         Some(ses) => ses,
         None => {
             let ehdl = ErrorHandle::get_new();
             unsafe {
                 *eh = ehdl.clone();
             }
-            ERROR_MAP.write().unwrap()
-                .insert(
-                    ehdl.clone(),
-                    not_found_from(&hdl)
-                );
+            ERROR_MAP
+                .write()
+                .unwrap()
+                .insert(ehdl.clone(), not_found_from(&hdl));
             return ElucidatorStatus::err();
         }
     };
@@ -436,34 +421,31 @@ pub extern "C" fn get_metadata_in_bb(
     match &mut r {
         Ok(o) => {
             unsafe {
-                let mut bn = blobs_into_bufnode(o);
+                let bn = blobs_into_bufnode(o);
                 *results = bn;
             }
             ElucidatorStatus::ok()
-        },
+        }
         Err(e) => {
             let ehdl = ErrorHandle::get_new();
             unsafe {
                 *eh = ehdl.clone();
             }
-            ERROR_MAP.write().unwrap()
-                .insert(
-                    ehdl.clone(),
-                    ApiError::Database(e.clone()),
-                );
+            ERROR_MAP
+                .write()
+                .unwrap()
+                .insert(ehdl.clone(), ApiError::Database(e.clone()));
             ElucidatorStatus::err()
-        },
+        }
     }
 }
 
 /// Print a session map
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn print_session(sh: *const SessionHandle) {
     unsafe {
         let map = SESSION_MAP.read().unwrap();
-        assert_eq!(1 as u32, 1 as u32);
-        assert_eq!(SessionHandle { hdl: 1 }, SessionHandle { hdl: 1});
-        let oops = SessionHandle { hdl: 1 };
         assert_eq!((*sh).id(), SessionHandle { hdl: 1 }.id());
         let ses = map.get(&(*sh));
         println!("{ses:#?}");
@@ -476,6 +458,7 @@ pub extern "C" fn print_session(sh: *const SessionHandle) {
 
 /// Print it all
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn print_the_mayhem() {
     println!("{:#?}", SESSION_MAP.read().unwrap());
 }

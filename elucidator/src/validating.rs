@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use crate::member::{Dtype, Sizing, MemberSpecification};
-use crate::token::{TokenClone, DtypeToken, IdentifierToken, SizingToken};
 use crate::error::*;
+use crate::member::{Dtype, MemberSpecification, Sizing};
 use crate::parsing::*;
+use crate::token::{DtypeToken, IdentifierToken, SizingToken, TokenClone};
 
 type Result<T, E = InternalError> = std::result::Result<T, E>;
 
@@ -16,21 +16,21 @@ pub(crate) fn validate_identifier(itoken: &IdentifierToken) -> Result<String> {
     let identifier = itoken.data.data;
     match &identifier.chars().next() {
         None => {
-            errors.push(InternalError::IllegalSpecification { 
+            errors.push(InternalError::IllegalSpecification {
                 offender: TokenClone::from_token_data(&itoken.data),
-                reason: SpecificationFailure::ZeroLengthIdentifier
+                reason: SpecificationFailure::ZeroLengthIdentifier,
             });
         }
         Some(c) => {
             if !c.is_alphabetic() {
-                errors.push(InternalError::IllegalSpecification { 
+                errors.push(InternalError::IllegalSpecification {
                     offender: TokenClone::from_token_data(&itoken.data),
-                    reason: SpecificationFailure::IdentifierStartsNonAlphabetical
+                    reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                 });
             }
         }
     }
-    
+
     let mut illegal_chars: Vec<char> = identifier
         .chars()
         .filter(|c| !valid_identifier_char(*c))
@@ -38,12 +38,10 @@ pub(crate) fn validate_identifier(itoken: &IdentifierToken) -> Result<String> {
     illegal_chars.sort();
     illegal_chars.dedup();
     if !illegal_chars.is_empty() {
-        errors.push(
-            InternalError::IllegalSpecification { 
-                offender: TokenClone::from_token_data(&itoken.data),
-                reason: SpecificationFailure::IllegalCharacters(illegal_chars)
-            }
-        );
+        errors.push(InternalError::IllegalSpecification {
+            offender: TokenClone::from_token_data(&itoken.data),
+            reason: SpecificationFailure::IllegalCharacters(illegal_chars),
+        });
     }
     if errors.is_empty() {
         Ok(identifier.to_string())
@@ -59,25 +57,20 @@ pub(crate) fn validate_dtype(dtoken: &DtypeToken) -> Result<Dtype> {
         "u16" => Dtype::UnsignedInteger16,
         "u32" => Dtype::UnsignedInteger32,
         "u64" => Dtype::UnsignedInteger64,
-        "i8"  => Dtype::SignedInteger8,
+        "i8" => Dtype::SignedInteger8,
         "i16" => Dtype::SignedInteger16,
         "i32" => Dtype::SignedInteger32,
         "i64" => Dtype::SignedInteger64,
         "f32" => Dtype::Float32,
         "f64" => Dtype::Float64,
         "string" => Dtype::Str,
-        _ => {
-            Err(
-                InternalError::IllegalSpecification{
-                    offender: TokenClone::from_token_data(&dtoken.data),
-                    reason: SpecificationFailure::IllegalDataType,
-                }   
-            )?  
-        },  
-    };  
+        _ => Err(InternalError::IllegalSpecification {
+            offender: TokenClone::from_token_data(&dtoken.data),
+            reason: SpecificationFailure::IllegalDataType,
+        })?,
+    };
     Ok(dt)
 }
-
 
 pub(crate) fn validate_sizing(stoken: &SizingToken) -> Result<Sizing> {
     let data = stoken.data.data;
@@ -86,40 +79,40 @@ pub(crate) fn validate_sizing(stoken: &SizingToken) -> Result<Sizing> {
         return Ok(Sizing::Dynamic);
     }
     match data.parse::<u64>() {
-        Ok(0) | Err(_) => {Err(
-            InternalError::IllegalSpecification {
-                offender: TokenClone::from_token_data(&stoken.data),
-                reason: SpecificationFailure::IllegalArraySizing 
-            }
-        )},
-        Ok(v) => {Ok(Sizing::Fixed(v))},
+        Ok(0) | Err(_) => Err(InternalError::IllegalSpecification {
+            offender: TokenClone::from_token_data(&stoken.data),
+            reason: SpecificationFailure::IllegalArraySizing,
+        }),
+        Ok(v) => Ok(Sizing::Fixed(v)),
     }
 }
 
 #[allow(clippy::unnecessary_unwrap)]
-pub(crate) fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<MemberSpecification, InternalError> {
+pub(crate) fn validate_memberspec(
+    mpo: &MemberSpecParserOutput,
+) -> Result<MemberSpecification, InternalError> {
     let mut errors: Vec<InternalError> = mpo.errors.clone();
 
     let ident = if mpo.has_ident() {
         match validate_identifier(&mpo.identifier.clone().unwrap()) {
-            Ok(o) => { Some(o) },
-            Err(e) => { 
+            Ok(o) => Some(o),
+            Err(e) => {
                 errors.push(e);
                 None
-            },
-        } 
+            }
+        }
     } else {
         None
     };
 
     let dtype = if mpo.has_dtype() {
         match validate_dtype(&mpo.typespec.clone().unwrap().dtype.unwrap()) {
-            Ok(o) => { Some(o) },
-            Err(e) => { 
+            Ok(o) => Some(o),
+            Err(e) => {
                 errors.push(e);
                 None
-            },
-        }  
+            }
+        }
     } else {
         None
     };
@@ -127,42 +120,38 @@ pub(crate) fn validate_memberspec(mpo: &MemberSpecParserOutput) -> Result<Member
     let sizing = if mpo.has_sizing() {
         let typespec = mpo.typespec.clone().unwrap();
         match &typespec.sizing {
-            Some(stoken) => { 
-                match validate_sizing(stoken) {
-                    Ok(o) => { Some(o) },
-                    Err(e) => { 
-                        errors.push(e);
-                        None 
-                    },
+            Some(stoken) => match validate_sizing(stoken) {
+                Ok(o) => Some(o),
+                Err(e) => {
+                    errors.push(e);
+                    None
                 }
             },
-            None => { Some(Sizing::Singleton) },
-        }  
+            None => Some(Sizing::Singleton),
+        }
     } else {
         None
     };
 
     if ident.is_some() && dtype.is_some() && sizing.is_some() {
         if !errors.is_empty() {
-            unreachable!("Parsed and validated MemberSpecification, but errors were also found: {:#?}", errors);
+            unreachable!(
+                "Parsed and validated MemberSpecification, but errors were also found: {:#?}",
+                errors
+            );
         }
         if dtype.clone().unwrap() == Dtype::Str && sizing.clone().unwrap() != Sizing::Singleton {
-            errors.push(
-                InternalError::IllegalSpecification {
-                    offender: TokenClone::from_token_data(
-                        &mpo.identifier.clone().unwrap().data
-                    ),
-                    reason: SpecificationFailure::IllegalArraySizing,
-                }
-            );
-            Err(InternalError::merge(&errors)) 
-        }
-        else {
+            errors.push(InternalError::IllegalSpecification {
+                offender: TokenClone::from_token_data(&mpo.identifier.clone().unwrap().data),
+                reason: SpecificationFailure::IllegalArraySizing,
+            });
+            Err(InternalError::merge(&errors))
+        } else {
             Ok(MemberSpecification::from_parts(
-                &ident.unwrap(), 
-                &sizing.unwrap(), 
-                &dtype.unwrap())
-            )
+                &ident.unwrap(),
+                &sizing.unwrap(),
+                &dtype.unwrap(),
+            ))
         }
     } else {
         Err(InternalError::merge(&errors))
@@ -185,36 +174,34 @@ fn repeated_identifiers<'a>(member_names: &'a Vec<&'a str>) -> Vec<&'a str> {
         .collect()
 }
 
-fn perform_metadata_partition(mpo: &MetadataSpecParserOutput) ->
-    (Vec<MemberSpecification>, Vec<Result<MemberSpecification>>)
-{
-    let results = mpo.member_outputs.iter()
+fn perform_metadata_partition(
+    mpo: &MetadataSpecParserOutput,
+) -> (Vec<MemberSpecification>, Vec<Result<MemberSpecification>>) {
+    let results = mpo
+        .member_outputs
+        .iter()
         .map(|x| validate_memberspec(x))
         .collect::<Vec<Result<MemberSpecification>>>();
 
     type BigResult = Result<MemberSpecification, InternalError>;
     type LongPartition = (Vec<BigResult>, Vec<BigResult>);
 
-    let (members, errs): LongPartition = results
-      .into_iter()
-      .partition(Result::is_ok);
+    let (members, errs): LongPartition = results.into_iter().partition(Result::is_ok);
 
-    let members: Vec<MemberSpecification> = members
-        .into_iter()
-        .map(Result::unwrap)
-        .collect();
+    let members: Vec<MemberSpecification> = members.into_iter().map(Result::unwrap).collect();
 
     (members, errs)
 }
 
 fn err_from_repeat(mpo: &MetadataSpecParserOutput, repeat: &str) -> InternalError {
     // Find matching token
-    let hits: Vec<TokenClone> = mpo.member_outputs
+    let hits: Vec<TokenClone> = mpo
+        .member_outputs
         .iter()
         .filter_map(|x| {
             if x.identifier.as_ref().unwrap().data.data == repeat {
                 Some(TokenClone::from_token_data(
-                    &x.identifier.as_ref().unwrap().data
+                    &x.identifier.as_ref().unwrap().data,
                 ))
             } else {
                 None
@@ -222,30 +209,32 @@ fn err_from_repeat(mpo: &MetadataSpecParserOutput, repeat: &str) -> InternalErro
         })
         .take(2)
         .collect();
-    InternalError::IllegalSpecification{
+    InternalError::IllegalSpecification {
         offender: hits[1].clone(),
-        reason: SpecificationFailure::RepeatedIdentifier{
+        reason: SpecificationFailure::RepeatedIdentifier {
             first: hits[0].clone(),
-        }
+        },
     }
 }
 
-pub(crate) fn validate_metadataspec(mpo: &MetadataSpecParserOutput) -> Result<Vec<MemberSpecification>, InternalError> {
+pub(crate) fn validate_metadataspec(
+    mpo: &MetadataSpecParserOutput,
+) -> Result<Vec<MemberSpecification>, InternalError> {
     let mut errors: Vec<InternalError> = mpo.errors.clone();
 
-    let members: Vec<&str> = mpo.member_outputs
+    let members: Vec<&str> = mpo
+        .member_outputs
         .iter()
         .filter(|x| x.identifier.is_some())
         .map(|x| x.identifier.as_ref().unwrap().data.data)
         .collect();
-    
+
     let (ok_members, errs) = perform_metadata_partition(mpo);
-    errs.iter().for_each(|e| {
-        errors.push(e.as_ref().unwrap_err().clone())
-    });
-    repeated_identifiers(&members).iter().for_each(|e| {
-        errors.push(err_from_repeat(mpo, e))
-    });
+    errs.iter()
+        .for_each(|e| errors.push(e.as_ref().unwrap_err().clone()));
+    repeated_identifiers(&members)
+        .iter()
+        .for_each(|e| errors.push(err_from_repeat(mpo, e)));
 
     if errors.is_empty() {
         Ok(ok_members)
@@ -257,8 +246,7 @@ pub(crate) fn validate_metadataspec(mpo: &MetadataSpecParserOutput) -> Result<Ve
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{parsing, validating, token::TokenClone, test_utils};
-    
+    use crate::{parsing, test_utils, token::TokenClone, validating};
 
     mod identifier {
         use super::*;
@@ -286,24 +274,19 @@ mod tests {
             let ident = validating::validate_identifier(&ipo.identifier.unwrap());
             pretty_assertions::assert_eq!(
                 ident,
-                Err(InternalError::merge(&vec![
+                Err(InternalError::merge(&[
                     InternalError::IllegalSpecification {
                         offender: TokenClone::new(ident_text.trim(), 0),
                         reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                     },
                     InternalError::IllegalSpecification {
                         offender: TokenClone::new(ident_text.trim(), 0),
-                        reason: SpecificationFailure::IllegalCharacters(
-                            vec![
-                                test_utils::crab_emoji()
-                                    .chars().next()
-                                    .unwrap()
-                            ]
-                        ),
-                    },
+                        reason: SpecificationFailure::IllegalCharacters(vec![
+                            test_utils::crab_emoji().chars().next().unwrap()
+                        ]),
+                    }
                 ]))
             );
-
         }
 
         #[test]
@@ -329,7 +312,9 @@ mod tests {
                 ident,
                 Err(InternalError::IllegalSpecification {
                     offender: TokenClone::new(ident_text.to_string().trim(), 1),
-                    reason: SpecificationFailure::IllegalCharacters(vec!['\n', '\r', ' ', '(', ')', '\u{85}']),
+                    reason: SpecificationFailure::IllegalCharacters(vec![
+                        '\n', '\r', ' ', '(', ')', '\u{85}'
+                    ]),
                 })
             );
         }
@@ -345,119 +330,84 @@ mod tests {
             let text = "u8";
             let dpo = parsing::get_dtype(text, 0);
             let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
-            pretty_assertions::assert_eq!(
-                dtype,
-                Ok(Dtype::Byte)
-            );
+            pretty_assertions::assert_eq!(dtype, Ok(Dtype::Byte));
         }
         #[test]
         fn u16_ok() {
             let text = "u16";
             let dpo = parsing::get_dtype(text, 0);
             let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
-            pretty_assertions::assert_eq!(
-                dtype,
-                Ok(Dtype::UnsignedInteger16)
-            );
+            pretty_assertions::assert_eq!(dtype, Ok(Dtype::UnsignedInteger16));
         }
         #[test]
         fn u32_ok() {
             let text = "u32";
             let dpo = parsing::get_dtype(text, 0);
             let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
-            pretty_assertions::assert_eq!(
-                dtype,
-                Ok(Dtype::UnsignedInteger32)
-            );
+            pretty_assertions::assert_eq!(dtype, Ok(Dtype::UnsignedInteger32));
         }
         #[test]
         fn u64_ok() {
             let text = "u64";
             let dpo = parsing::get_dtype(text, 0);
             let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
-            pretty_assertions::assert_eq!(
-                dtype,
-                Ok(Dtype::UnsignedInteger64)
-            );
+            pretty_assertions::assert_eq!(dtype, Ok(Dtype::UnsignedInteger64));
         }
         #[test]
         fn i8_ok() {
             let text = "i8";
             let dpo = parsing::get_dtype(text, 0);
             let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
-            pretty_assertions::assert_eq!(
-                dtype,
-                Ok(Dtype::SignedInteger8)
-            );
+            pretty_assertions::assert_eq!(dtype, Ok(Dtype::SignedInteger8));
         }
         #[test]
         fn i16_ok() {
             let text = "i16";
             let dpo = parsing::get_dtype(text, 0);
             let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
-            pretty_assertions::assert_eq!(
-                dtype,
-                Ok(Dtype::SignedInteger16)
-            );
+            pretty_assertions::assert_eq!(dtype, Ok(Dtype::SignedInteger16));
         }
         #[test]
         fn i32_ok() {
             let text = "i32";
             let dpo = parsing::get_dtype(text, 0);
             let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
-            pretty_assertions::assert_eq!(
-                dtype,
-                Ok(Dtype::SignedInteger32)
-            );
+            pretty_assertions::assert_eq!(dtype, Ok(Dtype::SignedInteger32));
         }
         #[test]
         fn i64_ok() {
             let text = "i64";
             let dpo = parsing::get_dtype(text, 0);
             let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
-            pretty_assertions::assert_eq!(
-                dtype,
-                Ok(Dtype::SignedInteger64)
-            );
+            pretty_assertions::assert_eq!(dtype, Ok(Dtype::SignedInteger64));
         }
         #[test]
         fn f32_ok() {
             let text = "f32";
             let dpo = parsing::get_dtype(text, 0);
             let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
-            pretty_assertions::assert_eq!(
-                dtype,
-                Ok(Dtype::Float32)
-            );
+            pretty_assertions::assert_eq!(dtype, Ok(Dtype::Float32));
         }
         #[test]
         fn f64_ok() {
             let text = "f64";
             let dpo = parsing::get_dtype(text, 0);
             let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
-            pretty_assertions::assert_eq!(
-                dtype,
-                Ok(Dtype::Float64)
-            );
+            pretty_assertions::assert_eq!(dtype, Ok(Dtype::Float64));
         }
         #[test]
         fn string_ok() {
             let text = "string";
             let dpo = parsing::get_dtype(text, 0);
             let dtype = validating::validate_dtype(&dpo.dtype.unwrap());
-            pretty_assertions::assert_eq!(
-                dtype,
-                Ok(Dtype::Str)
-            );
+            pretty_assertions::assert_eq!(dtype, Ok(Dtype::Str));
         }
         #[test]
         fn empty_string() {
             let text = "";
-            let dtype = validating::validate_dtype(
-                & DtypeToken {
-                    data: TokenData::new(text, 0, 0)
-                }
-            );
+            let dtype = validating::validate_dtype(&DtypeToken {
+                data: TokenData::new(text, 0, 0),
+            });
             pretty_assertions::assert_eq!(
                 dtype,
                 Err(InternalError::IllegalSpecification {
@@ -466,37 +416,25 @@ mod tests {
                 })
             );
         }
-    
+
         #[test]
         fn leading_whitespace_ok() {
             let text = "\u{85}\tu8";
-            let dtype = validating::validate_dtype(
-                &parsing::get_dtype(text, 0).dtype.unwrap()
-            );
-            pretty_assertions::assert_eq!(
-                dtype,
-                Ok(Dtype::Byte)
-            );
+            let dtype = validating::validate_dtype(&parsing::get_dtype(text, 0).dtype.unwrap());
+            pretty_assertions::assert_eq!(dtype, Ok(Dtype::Byte));
         }
-    
+
         #[test]
         fn trailing_whitespace_ok() {
             let text = "u8   \u{85}";
-            let dtype = validating::validate_dtype(
-                &parsing::get_dtype(text, 0).dtype.unwrap()
-            );
-            pretty_assertions::assert_eq!(
-                dtype,
-                Ok(Dtype::Byte)
-            );
+            let dtype = validating::validate_dtype(&parsing::get_dtype(text, 0).dtype.unwrap());
+            pretty_assertions::assert_eq!(dtype, Ok(Dtype::Byte));
         }
 
         #[test]
         fn null_character() {
             let text = "\0";
-            let dtype = validating::validate_dtype(
-                &parsing::get_dtype(text, 0).dtype.unwrap()
-            );
+            let dtype = validating::validate_dtype(&parsing::get_dtype(text, 0).dtype.unwrap());
             pretty_assertions::assert_eq!(
                 dtype,
                 Err(InternalError::IllegalSpecification {
@@ -514,22 +452,15 @@ mod tests {
             let text = "";
             let spo = parsing::get_sizing(text, 0);
             let sizing = validating::validate_sizing(&spo.sizing.unwrap());
-            pretty_assertions::assert_eq!(
-                sizing,
-                Ok(Sizing::Dynamic)
-            );
+            pretty_assertions::assert_eq!(sizing, Ok(Sizing::Dynamic));
         }
 
-        
         #[test]
         fn dynamic_whitespace_ok() {
             let text = "  \u{85}";
             let spo = parsing::get_sizing(text, 0);
             let sizing = validating::validate_sizing(&spo.sizing.unwrap());
-            pretty_assertions::assert_eq!(
-                sizing,
-                Ok(Sizing::Dynamic)
-            );
+            pretty_assertions::assert_eq!(sizing, Ok(Sizing::Dynamic));
         }
 
         #[test]
@@ -537,22 +468,15 @@ mod tests {
             let text = "10";
             let spo = parsing::get_sizing(text, 0);
             let sizing = validating::validate_sizing(&spo.sizing.unwrap());
-            pretty_assertions::assert_eq!(
-                sizing,
-                Ok(Sizing::Fixed(10))
-            );
+            pretty_assertions::assert_eq!(sizing, Ok(Sizing::Fixed(10)));
         }
 
-        
         #[test]
         fn fixed_whitespace_ok() {
             let text = "  10\u{85}";
             let spo = parsing::get_sizing(text, 0);
             let sizing = validating::validate_sizing(&spo.sizing.unwrap());
-            pretty_assertions::assert_eq!(
-                sizing,
-                Ok(Sizing::Fixed(10))
-            );
+            pretty_assertions::assert_eq!(sizing, Ok(Sizing::Fixed(10)));
         }
 
         #[test]
@@ -565,8 +489,9 @@ mod tests {
                 Err(InternalError::IllegalSpecification {
                     offender: TokenClone::new(text, 0),
                     reason: SpecificationFailure::IllegalArraySizing
-            }));
-        } 
+                })
+            );
+        }
 
         #[test]
         fn fixed_negative_fails() {
@@ -575,7 +500,7 @@ mod tests {
             let sizing = validating::validate_sizing(&spo.sizing.unwrap());
             pretty_assertions::assert_eq!(
                 sizing,
-                Err(InternalError::IllegalSpecification { 
+                Err(InternalError::IllegalSpecification {
                     offender: TokenClone::new(text, 0),
                     reason: SpecificationFailure::IllegalArraySizing,
                 })
@@ -589,12 +514,12 @@ mod tests {
             let sizing = validating::validate_sizing(&spo.sizing.unwrap());
             pretty_assertions::assert_eq!(
                 sizing,
-                Err(InternalError::IllegalSpecification { 
+                Err(InternalError::IllegalSpecification {
                     offender: TokenClone::new(text, 0),
                     reason: SpecificationFailure::IllegalArraySizing,
                 })
             );
-        }         
+        }
     }
 
     mod memberspec {
@@ -607,13 +532,11 @@ mod tests {
             let member = validating::validate_memberspec(&mpo);
             pretty_assertions::assert_eq!(
                 member,
-                Ok(
-                    MemberSpecification::from_parts(
-                        "foo",
-                        &Sizing::Singleton,
-                        &Dtype::UnsignedInteger32,
-                    )
-                )
+                Ok(MemberSpecification::from_parts(
+                    "foo",
+                    &Sizing::Singleton,
+                    &Dtype::UnsignedInteger32,
+                ))
             );
         }
 
@@ -625,12 +548,10 @@ mod tests {
             let member = validating::validate_memberspec(&mpo);
             pretty_assertions::assert_eq!(
                 member,
-                Err(
-                    InternalError::IllegalSpecification{
-                        offender: TokenClone::new(ident, 0),
-                        reason: SpecificationFailure::IllegalArraySizing,
-                    },
-                )
+                Err(InternalError::IllegalSpecification {
+                    offender: TokenClone::new(ident, 0),
+                    reason: SpecificationFailure::IllegalArraySizing,
+                },)
             );
         }
 
@@ -650,12 +571,10 @@ mod tests {
             // TODO: convert this after error refactor for promoting EOE to ZeroLengthIdentifer
             pretty_assertions::assert_eq!(
                 member,
-                Err(
-                    InternalError::Parsing{
-                        offender: TokenClone::new("", 0),
-                        reason: ParsingFailure::UnexpectedEndOfExpression,
-                    }
-                )
+                Err(InternalError::Parsing {
+                    offender: TokenClone::new("", 0),
+                    reason: ParsingFailure::UnexpectedEndOfExpression,
+                })
             )
         }
 
@@ -667,12 +586,10 @@ mod tests {
             // TODO: convert this after error refactor for promoting EOE to ZeroLengthIdentifer
             pretty_assertions::assert_eq!(
                 member,
-                Err(
-                    InternalError::Parsing{
-                        offender: TokenClone::new(" ", 4),
-                        reason: ParsingFailure::UnexpectedEndOfExpression,
-                    }
-                )
+                Err(InternalError::Parsing {
+                    offender: TokenClone::new(" ", 4),
+                    reason: ParsingFailure::UnexpectedEndOfExpression,
+                })
             )
         }
 
@@ -684,15 +601,15 @@ mod tests {
             pretty_assertions::assert_eq!(
                 member,
                 Err(InternalError::merge(&vec![
-                    InternalError::Parsing{
+                    InternalError::Parsing {
                         offender: TokenClone::new("", 6),
                         reason: ParsingFailure::UnexpectedEndOfExpression,
                     },
-                    InternalError::Parsing{
+                    InternalError::Parsing {
                         offender: TokenClone::new(" ", 5),
                         reason: ParsingFailure::UnexpectedEndOfExpression,
                     },
-                    InternalError::IllegalSpecification{
+                    InternalError::IllegalSpecification {
                         offender: TokenClone::new("5eva", 0),
                         reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                     },
@@ -707,15 +624,15 @@ mod tests {
             let member = validating::validate_memberspec(&mpo);
             pretty_assertions::assert_eq!(
                 member,
-                Err(InternalError::merge(&vec![
-                    InternalError::IllegalSpecification{
+                Err(InternalError::merge(&[
+                    InternalError::IllegalSpecification {
                         offender: TokenClone::new("5eva", 0),
                         reason: SpecificationFailure::IdentifierStartsNonAlphabetical,
                     },
-                    InternalError::IllegalSpecification{
+                    InternalError::IllegalSpecification {
                         offender: TokenClone::new("cat", 10),
                         reason: SpecificationFailure::IllegalArraySizing,
-                    },
+                    }
                 ]))
             );
         }
@@ -731,11 +648,11 @@ mod tests {
             let spec = validating::validate_metadataspec(&mpo);
             pretty_assertions::assert_eq!(
                 spec,
-                Ok(vec![
-                    MemberSpecification::from_parts(
-                        "foo", &Sizing::Singleton, &Dtype::UnsignedInteger32
-                    ),
-                ])
+                Ok(vec![MemberSpecification::from_parts(
+                    "foo",
+                    &Sizing::Singleton,
+                    &Dtype::UnsignedInteger32
+                ),])
             );
         }
 
@@ -748,14 +665,12 @@ mod tests {
                 spec,
                 Ok(vec![
                     MemberSpecification::from_parts(
-                        "foo", &Sizing::Singleton, &Dtype::UnsignedInteger32
+                        "foo",
+                        &Sizing::Singleton,
+                        &Dtype::UnsignedInteger32
                     ),
-                    MemberSpecification::from_parts(
-                        "bar", &Sizing::Dynamic, &Dtype::Byte
-                    ),
-                    MemberSpecification::from_parts(
-                        "baz", &Sizing::Singleton, &Dtype::Str
-                    ),
+                    MemberSpecification::from_parts("bar", &Sizing::Dynamic, &Dtype::Byte),
+                    MemberSpecification::from_parts("baz", &Sizing::Singleton, &Dtype::Str),
                 ])
             );
         }
@@ -767,7 +682,7 @@ mod tests {
             let spec = validating::validate_metadataspec(&mpo);
             pretty_assertions::assert_eq!(
                 spec,
-                Err(InternalError::merge(&vec![
+                Err(InternalError::merge(&[
                     InternalError::IllegalSpecification {
                         offender: TokenClone {
                             data: "5ever".to_string(),
@@ -783,7 +698,7 @@ mod tests {
                             column_end: 26,
                         },
                         reason: SpecificationFailure::IllegalArraySizing,
-                    },
+                    }
                 ])),
             );
         }
@@ -801,7 +716,7 @@ mod tests {
                         column_start: 10,
                         column_end: 13,
                     },
-                    reason: SpecificationFailure::RepeatedIdentifier{
+                    reason: SpecificationFailure::RepeatedIdentifier {
                         first: TokenClone {
                             data: "foo".to_string(),
                             column_start: 0,
@@ -819,7 +734,7 @@ mod tests {
             let spec = validating::validate_metadataspec(&mpo);
             pretty_assertions::assert_eq!(
                 spec,
-                Err(InternalError::merge(&vec![
+                Err(InternalError::merge(&[
                     InternalError::IllegalSpecification {
                         offender: TokenClone::new("bar", 5),
                         reason: SpecificationFailure::IllegalDataType,
@@ -830,17 +745,16 @@ mod tests {
                             column_start: 10,
                             column_end: 13,
                         },
-                        reason: SpecificationFailure::RepeatedIdentifier{
+                        reason: SpecificationFailure::RepeatedIdentifier {
                             first: TokenClone {
                                 data: "foo".to_string(),
                                 column_start: 0,
                                 column_end: 3,
                             },
                         }
-                    },
+                    }
                 ]))
             );
         }
-
     }
 }

@@ -1,4 +1,4 @@
-use crate::member::{sizing::Sizing, dtype::Dtype};
+use crate::member::{dtype::Dtype, sizing::Sizing};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MemberSpecification {
@@ -23,22 +23,24 @@ impl MemberSpecification {
 impl std::fmt::Display for MemberSpecification {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let sizing_string = match self.sizing {
-            Sizing::Singleton => { format!("") },
-            Sizing::Dynamic => { format!("[]") },
-            Sizing::Fixed(n) => { format!("[{n}]") }
+            Sizing::Singleton => String::new(),
+            Sizing::Dynamic => "[]".to_string(),
+            Sizing::Fixed(n) => {
+                format!("[{n}]")
+            }
         };
         let dtype_string = match self.dtype {
-            Dtype::Byte => { format!("u8") },
-            Dtype::UnsignedInteger16 => { format!("u16") },
-            Dtype::UnsignedInteger32 => { format!("u32") },
-            Dtype::UnsignedInteger64 => { format!("u64") },
-            Dtype::SignedInteger8 => { format!("i8") },
-            Dtype::SignedInteger16 => { format!("i16") },
-            Dtype::SignedInteger32 => { format!("i32") },
-            Dtype::SignedInteger64 => { format!("i64") },
-            Dtype::Float32 => { format!("f32") },
-            Dtype::Float64 => { format!("f64") },
-            Dtype::Str => { format!("string") },
+            Dtype::Byte => "u8".to_string(),
+            Dtype::UnsignedInteger16 => "u16".to_string(),
+            Dtype::UnsignedInteger32 => "u32".to_string(),
+            Dtype::UnsignedInteger64 => "u64".to_string(),
+            Dtype::SignedInteger8 => "i8".to_string(),
+            Dtype::SignedInteger16 => "i16".to_string(),
+            Dtype::SignedInteger32 => "i32".to_string(),
+            Dtype::SignedInteger64 => "i64".to_string(),
+            Dtype::Float32 => "f32".to_string(),
+            Dtype::Float64 => "f64".to_string(),
+            Dtype::Str => "string".to_string(),
         };
         let m = format!("{}: {dtype_string}{sizing_string}", self.identifier);
         write!(f, "{m}")

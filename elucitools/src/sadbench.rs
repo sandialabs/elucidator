@@ -1,16 +1,13 @@
 use clap::Parser;
-use elucidator::{
-    representable::Representable
-};
+use elucidator::representable::Representable;
 use elucidator_db::{
-    database::{Config, Database, DatabaseConfig, Metadata},
     backends::rtree::RTreeDatabase,
-    backends::sqlite::{SqliteConfig, SqlDatabase},
+    database::{Database, Metadata},
 };
 use rand::random;
 use std::{
     fs::{File, OpenOptions},
-    io::{prelude::*, Write},
+    io::Write,
     path::Path,
     time::Instant,
 };
@@ -39,7 +36,7 @@ fn rand_pair() -> (f64, f64) {
     }
 }
 
-static designation: &'static str = "pdf";
+static DESIGNATION: &str = "pdf";
 
 type Bb = (f64, f64, f64, f64, f64, f64, f64, f64);
 fn random_bb() -> Bb {
@@ -47,16 +44,7 @@ fn random_bb() -> Bb {
     let (ymin, ymax) = rand_pair();
     let (zmin, zmax) = rand_pair();
     let (tmin, tmax) = rand_pair();
-    (
-        xmin,
-        xmax,
-        ymin,
-        ymax,
-        zmin,
-        zmax,
-        tmin,
-        tmax,
-    )
+    (xmin, xmax, ymin, ymax, zmin, zmax, tmin, tmax)
 }
 
 fn metadata_from(buffer: &[u8]) -> Metadata {
@@ -74,13 +62,18 @@ fn metadata_from(buffer: &[u8]) -> Metadata {
         zmax,
         tmin,
         tmax,
-        designation,
-        buffer
+        designation: DESIGNATION,
+        buffer,
     }
 }
 
 fn main() {
-    let Args {count, size, queries, savename} = Args::parse();
+    let Args {
+        count,
+        size,
+        queries,
+        savename,
+    } = Args::parse();
     let pdf_size = size * std::mem::size_of::<u32>();
     let spec = format!("pdf: u32[{}]", size);
     let random_vals: Vec<Vec<u8>> = (0..count)
@@ -91,9 +84,7 @@ fn main() {
                 .as_buffer()
         })
         .collect();
-    let random_metadata: Vec<Metadata> = random_vals.iter()
-        .map(|x| metadata_from(x))
-        .collect();
+    let random_metadata: Vec<Metadata> = random_vals.iter().map(|x| metadata_from(x)).collect();
     let start_time = Instant::now();
     let mut db = RTreeDatabase::new(None, None).unwrap();
     db.insert_spec_text("pdf", &spec).unwrap();
@@ -107,20 +98,18 @@ fn main() {
     let eps = 1e-16;
     let start_time = Instant::now();
     for x in random_bbs {
-        db.get_metadata_in_bb(x.0, x.1, x.2, x.3, x.4, x.5, x.6, x.7, "pdf", Some(eps)).unwrap();
+        db.get_metadata_in_bb(x.0, x.1, x.2, x.3, x.4, x.5, x.6, x.7, "pdf", Some(eps))
+            .unwrap();
     }
     let elapsed_queries = start_time.elapsed();
     if let Some(fname) = savename {
         let p = Path::new(&fname);
         let mut file = if !p.exists() {
-            let mut f = File::create(&p).unwrap();
-            write!(&mut f, "count,size,queries,insertion,query\n").unwrap();
+            let mut f = File::create(p).unwrap();
+            writeln!(&mut f, "count,size,queries,insertion,query").unwrap();
             f
         } else {
-            OpenOptions::new()
-                .append(true)
-                .open(&fname)
-                .unwrap()
+            OpenOptions::new().append(true).open(&fname).unwrap()
         };
 
         let s = format!(
