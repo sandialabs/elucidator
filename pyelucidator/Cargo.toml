@@ -12,3 +12,7 @@ crate-type = ["cdylib"]
 elucidator = { version = "0.1.0", path = "../elucidator" }
 elucidator-db = { version = "0.1.0", path = "../elucidator-db" }
 pyo3 = "0.21.1"
+
+[features]
+extension-module = ["pyo3/extension-module"]
+default = ["extension-module"]
