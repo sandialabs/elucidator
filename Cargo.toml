@@ -6,7 +6,7 @@ members = [
     "elucitools",
     "elucidator_macros",
     "elucidatorc",
-    "pyelucidator",
+    "pyelucidator", "elucidator-examples/rust/monte_carlo",
 ]
 resolver = "2"
 
