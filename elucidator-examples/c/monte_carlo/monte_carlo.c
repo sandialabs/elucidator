@@ -157,9 +157,9 @@ StepSummary summarize_bufnodes(BufNode **bufnodes) {
             exit(1);
         }
 
-        StepSummary *stepSummary = (StepSummary *)current->p;
-        summary.hits += stepSummary->hits;
-        summary.misses += stepSummary->misses;
+        StepSummary *current_timestep_summary = (StepSummary *)current->p;
+        summary.hits += current_timestep_summary->hits;
+        summary.misses += current_timestep_summary->misses;
         current = current->next;
     }
     return summary;
