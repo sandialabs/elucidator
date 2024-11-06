@@ -83,7 +83,7 @@ ElucidatorStatus run_experiment(SessionHandle * sh, ErrorHandle * eh, uint64_t n
     for (uint64_t step = 0; step < n_steps; step++) {
         StepSummary summary = run_experiment_step(samples_per_step);
         // Upper and lower bounds for experiment region: x, y, z, t
-        Point a = { -1.0, -1.0, -1.0, 0};
+        Point a = { -1.0, -1.0, -1.0, step};
         Point b = {1.0, 1.0, 1.0, step};
         BoundingBox bb = {a, b};
         uint8_t *blob = (uint8_t*)&summary;
