@@ -1,10 +1,10 @@
 use std::iter::Enumerate;
 
 use elucidator::value::DataValue;
+use elucidator::Representable;
 use elucidator_db::backends::rtree::RTreeDatabase;
 use elucidator_db::database::{Database, Metadata};
 use elucidator_db::error::DatabaseError;
-use elucidator::Representable;
 
 use rand::prelude::*;
 
@@ -20,7 +20,7 @@ struct AnalysisResult {
     total_hits: u64,
     total_misses: u64,
     pi_estimate: f64,
-    pi_95_ci: (f64, f64)
+    pi_95_ci: (f64, f64),
 }
 
 fn simulate_step(trials: usize) -> StepSummary {
@@ -33,19 +33,20 @@ fn simulate_step(trials: usize) -> StepSummary {
         match x.powi(2) + y.powi(2) <= 1.0 {
             true => {
                 hits += 1;
-            },
+            }
             false => {
                 misses += 1;
-            },
+            }
         }
     }
-    StepSummary {
-        hits,
-        misses
-    }
+    StepSummary { hits, misses }
 }
 
-fn run_experiment(db: &mut dyn Database, n_steps: usize, samples_per_step: usize) -> Result<(), DatabaseError> {
+fn run_experiment(
+    db: &mut dyn Database,
+    n_steps: usize,
+    samples_per_step: usize,
+) -> Result<(), DatabaseError> {
     for idx in 0..n_steps {
         let step = simulate_step(samples_per_step);
         let mut buffer: Vec<u8> = Vec::with_capacity(8);
@@ -61,7 +62,7 @@ fn run_experiment(db: &mut dyn Database, n_steps: usize, samples_per_step: usize
             tmin: idx as f64,
             tmax: idx as f64,
             designation: "state",
-            buffer: &buffer
+            buffer: &buffer,
         };
         db.insert_metadata(&md)?;
     }
@@ -70,7 +71,7 @@ fn run_experiment(db: &mut dyn Database, n_steps: usize, samples_per_step: usize
 
 fn calc_confidence_interval(hits: f64, misses: f64, zscore: f64) -> (f64, f64) {
     let p = hits / (hits + misses);
-    let se = (p*(1.0 - p)/(hits+misses)).sqrt();
+    let se = (p * (1.0 - p) / (hits + misses)).sqrt();
     let pi_upper_bound = 4.0 * (p + zscore * se);
     let pi_lower_bound = 4.0 * (p - zscore * se);
     (pi_lower_bound, pi_upper_bound)
@@ -91,27 +92,35 @@ fn analyze(db: &mut dyn Database, timestep: usize) -> Result<AnalysisResult, Dat
     let pi_95_ci: (f64, f64);
     let data = db.get_metadata_in_bb(
         -1.0,
-        1.0, 
+        1.0,
         -1.0,
-        1.0, 
+        1.0,
         -1.0,
-        1.0, 
+        1.0,
         0.0,
         timestep as f64,
         "state",
         None,
     )?;
     for metadata in data {
-        let hits = metadata.get("hits").unwrap_or(&DataValue::UnsignedInteger64(0));
-        let misses = metadata.get("misses").unwrap_or(&DataValue::UnsignedInteger64(0));
+        let hits = metadata
+            .get("hits")
+            .unwrap_or(&DataValue::UnsignedInteger64(0));
+        let misses = metadata
+            .get("misses")
+            .unwrap_or(&DataValue::UnsignedInteger64(0));
         match hits {
-            DataValue::UnsignedInteger64(h) => {total_hits += h},
-            _ => { unreachable!() },
+            DataValue::UnsignedInteger64(h) => total_hits += h,
+            _ => {
+                unreachable!()
+            }
         }
         match misses {
-            DataValue::UnsignedInteger64(m) => {total_misses += m},
-            _ => { unreachable!() },
-        }  
+            DataValue::UnsignedInteger64(m) => total_misses += m,
+            _ => {
+                unreachable!()
+            }
+        }
     }
 
     pi_estimate = calc_pi_estimate(total_hits as f64, total_misses as f64);
@@ -132,11 +141,15 @@ fn main() {
     const DISPLAY_INTERVAL: usize = 5000;
 
     let mut db: RTreeDatabase = Database::new(None, None).unwrap();
-    db.insert_spec_text("state", "hits: u64, misses: u64").unwrap();
+    db.insert_spec_text("state", "hits: u64, misses: u64")
+        .unwrap();
 
-    run_experiment(&mut db, N_STEPS, SAMPLES_PER_STEP).unwrap();    
+    run_experiment(&mut db, N_STEPS, SAMPLES_PER_STEP).unwrap();
     for t in (DISPLAY_INTERVAL..=N_STEPS).step_by(DISPLAY_INTERVAL) {
         let analysis = analyze(&mut db, t).unwrap();
-        println!("Timestep {t}: Pi ~= {}, 95% CI ({}, {})", analysis.pi_estimate, analysis.pi_95_ci.0, analysis.pi_95_ci.1);
+        println!(
+            "Timestep {t}: Pi ~= {}, 95% CI ({}, {})",
+            analysis.pi_estimate, analysis.pi_95_ci.0, analysis.pi_95_ci.1
+        );
     }
 }
