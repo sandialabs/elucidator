@@ -101,12 +101,8 @@ fn analyze(db: &mut dyn Database, timestep: usize) -> Result<AnalysisResult, Dat
         None,
     )?;
     for metadata in data {
-        let hits = metadata
-            .get("hits")
-            .unwrap_or(&DataValue::UnsignedInteger64(0));
-        let misses = metadata
-            .get("misses")
-            .unwrap_or(&DataValue::UnsignedInteger64(0));
+        let hits = metadata.get("hits").unwrap();
+        let misses = metadata.get("misses").unwrap();
         match hits {
             DataValue::UnsignedInteger64(h) => total_hits += h,
             _ => {
