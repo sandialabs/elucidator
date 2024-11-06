@@ -30,13 +30,10 @@ fn simulate_step(trials: usize) -> StepSummary {
     for _ in 0..trials {
         let x: f32 = rng.gen_range(-1.0..=1.0);
         let y: f32 = rng.gen_range(-1.0..=1.0);
-        match x.powi(2) + y.powi(2) <= 1.0 {
-            true => {
-                hits += 1;
-            }
-            false => {
-                misses += 1;
-            }
+        if x.powi(2) + y.powi(2) <= 1.0 {
+            hits += 1;
+        } else {
+            misses += 1;
         }
     }
     StepSummary { hits, misses }
