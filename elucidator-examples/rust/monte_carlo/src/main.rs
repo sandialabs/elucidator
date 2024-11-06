@@ -44,9 +44,10 @@ fn run_experiment(
     n_steps: usize,
     samples_per_step: usize,
 ) -> Result<(), DatabaseError> {
+    const METADATA_BUFFER_SIZE: usize = size_of::<StepSummary>();
     for idx in 0..n_steps {
         let step = simulate_step(samples_per_step);
-        let mut buffer: Vec<u8> = Vec::with_capacity(8);
+        let mut buffer: Vec<u8> = Vec::with_capacity(METADATA_BUFFER_SIZE);
         buffer.extend(step.hits.as_buffer());
         buffer.extend(step.misses.as_buffer());
         let md = Metadata {
