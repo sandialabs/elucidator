@@ -106,7 +106,7 @@ StepSummary run_experiment_step(uint64_t samples_per_step) {
             ++hits;
         }
         else {
-            misses++;
+            ++misses;
         }
     }
     StepSummary summary = {hits, misses};
