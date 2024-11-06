@@ -103,7 +103,7 @@ StepSummary run_experiment_step(uint64_t samples_per_step) {
         y = (double)rand() / RAND_MAX;
 
         if (x * x + y * y <= 1) {
-            hits++;
+            ++hits;
         }
         else {
             misses++;
