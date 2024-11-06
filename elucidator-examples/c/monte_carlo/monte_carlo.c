@@ -71,7 +71,7 @@ ElucidatorStatus setup(SessionHandle * sh, ErrorHandle * eh) {
     status = new_session(sh, ELUCIDATOR_RTREE);
     if (print_error_if_not_ok(eh, status) != ELUCIDATOR_OK) return status;
     status = add_spec_to_session(designation, spec, sh, eh);
-    if (print_error_if_not_ok(eh, status) != ELUCIDATOR_OK) return status;
+    print_error_if_not_ok(eh, status);
     return status;
 }
 
