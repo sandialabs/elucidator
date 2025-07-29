@@ -4,6 +4,7 @@ pub use representable::Representable;
 
 pub mod designation;
 pub mod error;
+pub mod interpret;
 pub mod member;
 mod parsing;
 pub mod representable;
