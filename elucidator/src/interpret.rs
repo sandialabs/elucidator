@@ -15,7 +15,7 @@ mod test {
     #[derive(Interpret, Debug, Clone)]
     struct MyPoint {
         x: u8,
-        y: u8,
+        y: Vec<u8>,
     }
 
     #[derive(Interpret, Debug, Clone)]
