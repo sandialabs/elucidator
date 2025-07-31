@@ -1,9 +1,247 @@
 use std::fmt;
 
+macro_rules! combine_single_errors {
+    ( $( $result:expr ),+ $(,)? ) => {{
+        vec![$( $result.clone().err() ),+]
+            .into_iter()
+            .flatten()
+            .reduce(|mut acc, err| {
+                acc.combine(err);
+                acc
+            })
+    }};
+}
+
+macro_rules! combine_iter_errors {
+    ( $iter:expr ) => {{
+        $iter
+            .into_iter()
+            .filter_map(|result| result.clone().err())
+            .reduce(|mut acc, err| {
+                acc.combine(err);
+                acc
+            })
+    }};
+}
+
+pub struct InterpretStruct {
+    ident: Identifier,
+    fields: Vec<Field>
+}
+
+impl InterpretStruct {
+    pub fn new(context: syn::DeriveInput) -> syn::Result<Self> {
+        let ident = Identifier::try_from(&context.ident);
+        let fields: syn::Result<Vec<Field>> = match &context.data {
+            syn::Data::Struct(syn::DataStruct {fields, ..} ) => {
+                let fields: Vec<syn::Result<Field>> = fields
+                    .iter()
+                    .map(|f| Field::try_from(f))
+                    .collect();
+                match combine_iter_errors!(&fields) {
+                    Some(e) => syn::Result::Err(e),
+                    None => syn::Result::Ok(fields.into_iter().map(syn::Result::unwrap).collect::<Vec<Field>>()),
+                }
+            }
+            _ => {
+                syn_err(
+                    &context,
+                    "Interpret can only be derived on structs."
+                )
+            }
+        };
+        let check_no_generics = if context.generics.params.is_empty() {
+            syn::Result::Ok(())
+        } else {
+            syn_err(
+                &context,
+                "Deriving Interpret is not supported with generic parameters."
+            )
+        };
+        // syn_err(&context, "Hello world!")?;
+        let check_no_attributes = if context.attrs.is_empty() {
+            syn::Result::Ok(())
+        } else {
+            syn_err(
+                &context,
+                "Deriving Interpret does not support additional attributes."
+            )
+        };
+        match combine_single_errors!(ident, fields, check_no_generics, check_no_attributes) {
+            Some(e) => syn::Result::Err(e),
+            None => {
+                syn::Result::Ok(Self {
+                    ident: ident.unwrap(),
+                    fields: fields.unwrap(),
+                })
+            }
+        }
+    }
+
+    fn get_designation_spec(&self) -> String {
+        self.fields
+            .iter()
+            .map(|f| f.to_string())
+            .collect::<Vec<String>>()
+            .join(", ")
+    }
+}
+
+impl quote::ToTokens for InterpretStruct {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let name = &self.ident;
+        let designation_spec = self.get_designation_spec();
+
+        let impl_block = quote::quote! {
+            impl Interpret for #name {
+                fn get_spec() -> DesignationSpecification {
+                    DesignationSpecification::from_text(#designation_spec).unwrap()
+                }
+                fn from_eluciblob() -> Result<Self, ElucidatorError> { todo!("Derived implementation of from_eluciblob not implemented.") }
+                fn to_eluciblob() -> Result<Self, ElucidatorError> { todo!("Derived implementation of to_eluciblob not implemented.") }
+            }
+        };
+        impl_block.to_tokens(tokens)
+    }
+}
+
+#[derive(Clone)]
+struct Field {
+    ident: Identifier,
+    field_type: PrimitiveType,
+    field_sizing: Sizing,
+}
+
+impl TryFrom<&syn::Field> for Field {
+    type Error = syn::Error;
+
+    fn try_from(context: &syn::Field) -> Result<Self, Self::Error> {
+        let ident = match &context.ident {
+            Some(ident) => Identifier::try_from(ident),
+            None => syn_err(&context.ident, "The field has no identifier.")
+        };
+        let field_type = match &context.ty {
+            syn::Type::Array(syn::TypeArray { elem, .. }) => {
+                PrimitiveType::try_from(elem.as_ref())
+            },
+            syn::Type::Path(type_path) => {
+                let last_segment = get_last_type_path_segment(type_path)?;
+                if last_segment.ident.to_string() == "Vec" {
+                    let vec_inner_type = get_type_path_from_vec_args(last_segment)?;
+                    PrimitiveType::try_from(vec_inner_type)
+                } else {
+                    PrimitiveType::try_from(type_path)
+                }
+            }
+            _ => {
+                syn_err(&context.ty, "Unsupported field type, expected array or type path.")
+            },
+            // todo!("Raise error - Can't get field type - Match path arm")
+        };
+        let field_sizing = Sizing::try_from(&context.ty);
+        match combine_single_errors!(ident, field_type, field_sizing) {
+            Some(e) => syn::Result::Err(e),
+            None => {
+                syn::Result::Ok(Self {
+                    ident: ident.unwrap(),
+                    field_type: field_type.unwrap(),
+                    field_sizing: field_sizing.unwrap(),
+                })
+            }
+        }
+    }
+}
+
+impl fmt::Display for Field {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let member_string = format!(
+            "{}: {}{}",
+            self.ident,
+            self.field_type,
+            self.field_sizing,
+       );
+        write!(f, "{}", member_string)
+    }
+}
+
+#[derive(Clone)]
+struct Identifier {
+    ident: String
+}
+
+impl fmt::Display for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { 
+        write!(f, "{}", self.ident)
+    }
+}
+
+impl TryFrom<&syn::Ident> for Identifier {
+    type Error = syn::Error;
+
+    fn try_from(value: &syn::Ident) -> Result<Self, Self::Error> {
+        let ident = value.to_string();
+        // This error is an instant return
+        // If there is no length, we can't check anything else
+        if ident.len() == 0 {
+            syn_err(value, "Identifier must have a non-zero length.")?;
+        }
+        // These errors can be combined
+        let first_alphabetic = if ident.chars().next().unwrap().is_alphabetic() {
+            Ok(())
+        } else {
+            syn_err(value, "Identifier must start with an alphabetic character.")
+        };
+        let all_alphanumeric = if ident.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            Ok(())
+        } else {
+            syn_err(
+                value, 
+                "Identifier must only contain alphanumeric or underscore characters."
+            )
+        };
+        match combine_single_errors!(first_alphabetic, all_alphanumeric) {
+            Some(e) => syn::Result::Err(e)?,
+            None => syn::Result::Ok(Self { ident }),
+        }
+    }
+}
+
+impl quote::ToTokens for Identifier {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let ident = proc_macro2::Ident::new(&self.to_string(), proc_macro2::Span::call_site());
+        ident.to_tokens(tokens);
+    }
+}
+
+#[derive(Clone)]
 enum Sizing {
     Singleton,
     Fixed(usize),
     Dynamic,
+}
+
+impl TryFrom<&syn::Type> for Sizing {
+    type Error = syn::Error;
+
+    fn try_from(value: &syn::Type) -> Result<Self, Self::Error> {
+        match value {
+            syn::Type::Array(syn::TypeArray {
+                len: syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Int(litint), .. }),
+                ..
+            }) => {
+                let n = litint.base10_parse()?;
+                Ok(Sizing::Fixed(n))
+            },
+            syn::Type::Path(type_path) => {
+                match get_last_type_path_segment(type_path)?.arguments {
+                    syn::PathArguments::None => syn::Result::Ok(Sizing::Singleton),
+                    syn::PathArguments::AngleBracketed(_) => syn::Result::Ok(Sizing::Dynamic),
+                    _ => todo!("Raise error - Interpret requires primitives, a vector, or an array to determine sizing")
+                }
+            }
+            _ => todo!("Raise error - Interpret requires primitives, a vector, or an array to determine sizing"),
+        }
+    }
 }
 
 impl fmt::Display for Sizing {
@@ -17,8 +255,8 @@ impl fmt::Display for Sizing {
     }
 }
 
-
-enum Type {
+#[derive(Clone)]
+enum PrimitiveType {
     Byte,
     UnsignedInteger16,
     UnsignedInteger32,
@@ -32,381 +270,70 @@ enum Type {
     Str,
 }
 
-struct InterpretStruct {
-    fields: Vec<Field>
+impl TryFrom<&syn::Type> for PrimitiveType {
+    type Error = syn::Error;
+
+    fn try_from(value: &syn::Type) -> Result<Self, Self::Error> {
+        match value {
+            syn::Type::Path(type_path) => { Self::try_from(type_path) }
+            _ => todo!("Raise error - unexpected type - type must be expressed as a type path for Interpret"),
+        }
+    }
 }
 
-struct Field {
-    field_type: Type,
-    field_sizing: Sizing,
+impl TryFrom<&syn::TypePath> for PrimitiveType {
+    type Error = syn::Error;
+
+    fn try_from(value: &syn::TypePath) -> Result<Self, Self::Error> {
+        let segment = get_last_type_path_segment(value)?;
+        let segment_type = segment.ident.to_string();
+
+        let syn::PathArguments::None = segment.arguments else {
+            todo!("Raise error - not primitive")
+        };
+        
+        match segment_type.as_str() {
+            "u8" => syn::Result::Ok(PrimitiveType::Byte),
+            "u16" => syn::Result::Ok(PrimitiveType::UnsignedInteger16),
+            "u32" => syn::Result::Ok(PrimitiveType::UnsignedInteger32),
+            "u64" => syn::Result::Ok(PrimitiveType::UnsignedInteger64),
+            "i8" => syn::Result::Ok(PrimitiveType::SignedInteger8),
+            "i16" => syn::Result::Ok(PrimitiveType::SignedInteger16),
+            "i32" => syn::Result::Ok(PrimitiveType::SignedInteger32),
+            "i64" => syn::Result::Ok(PrimitiveType::SignedInteger64),
+            "f32" => syn::Result::Ok(PrimitiveType::Float32),
+            "f64" => syn::Result::Ok(PrimitiveType::Float64),
+            "String" => syn::Result::Ok(PrimitiveType::Str),
+            unexpected => syn_err(
+                value, 
+                format!("'{}' is not an Elucidator primitive type", unexpected)
+            ),
+        }
+    }
 }
 
-
-impl fmt::Display for Type {
+impl fmt::Display for PrimitiveType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let type_str = match self {
-            Type::Byte => "u8",
-            Type::UnsignedInteger16 => "u16",
-            Type::UnsignedInteger32 => "u32",
-            Type::UnsignedInteger64 => "u64",
-            Type::SignedInteger8 => "i8",
-            Type::SignedInteger16 => "i16",
-            Type::SignedInteger32 => "i32",
-            Type::SignedInteger64 => "i64",
-            Type::Float32 => "f32",
-            Type::Float64 => "f64",
-            Type::Str => "String",
+            PrimitiveType::Byte => "u8",
+            PrimitiveType::UnsignedInteger16 => "u16",
+            PrimitiveType::UnsignedInteger32 => "u32",
+            PrimitiveType::UnsignedInteger64 => "u64",
+            PrimitiveType::SignedInteger8 => "i8",
+            PrimitiveType::SignedInteger16 => "i16",
+            PrimitiveType::SignedInteger32 => "i32",
+            PrimitiveType::SignedInteger64 => "i64",
+            PrimitiveType::Float32 => "f32",
+            PrimitiveType::Float64 => "f64",
+            PrimitiveType::Str => "String",
         };
         write!(f, "{}", type_str)
     }
 }
 
-impl TryFrom<&syn::Type> for Type {
-    type Error = syn::Error;
+// Helper functions
 
-    fn try_from(value: &syn::Type) -> Result<Self, Self::Error> {
-        match value {
-            syn::Type::Array(type_array) => { todo!() },
-
-            _ => todo!(),
-        }
-        todo!();
-    }
-}
-
-
-// impl From<&syn::Type> for Type {
-//     // Function to match syn type to elucidator type, error if unknown.
-//     // impl from
-//     fn from(syn_type: &syn::Type) -> Self {
-//         match syn_type {
-//             syn::Type::Path(type_path) => {
-//                 let segment = type_path
-//                     .path
-//                     .segments
-//                     .last()
-//                     .expect("Type path should have at least one segment");
-
-//                 match segment.ident.to_string().as_str() {
-//                     "u8" => Type::Byte,
-//                     "u16" => Type::UnsignedInteger16,
-//                     "u32" => Type::UnsignedInteger32,
-//                     "u64" => Type::UnsignedInteger64,
-//                     "i8" => Type::SignedInteger8,
-//                     "i16" => Type::SignedInteger16,
-//                     "i32" => Type::SignedInteger32,
-//                     "i64" => Type::SignedInteger64,
-//                     "f32" => Type::Float32,
-//                     "f64" => Type::Float64,
-//                     "String" => Type::Str,
-//                     "Vec" => panic!("Here!"),
-//                     _ => panic!("Unexpected type encountered when deriving interpret."),
-//                 }
-//             }
-//             syn::Type::Array(_syn_arr) => {
-//                 unimplemented!("Types from array not implemented")
-//             }
-//             syn::Type::Reference(_syn_ref) => {
-//                 unimplemented!("Types from reference not implemented")
-//             }
-//             _ => panic!("Unsupported syn::Type variant."),
-//         }
-//     }
-// }
-
-
-pub fn extract_fields(input: &syn::DeriveInput) -> syn::Result<Vec<&syn::Field>> {
-    // Extract fields from the struct
-    match &input.data {
-        syn::Data::Struct(data_struct) => {
-            match &data_struct.fields {
-                syn::Fields::Named(fields_named) => {
-                    // For structs with named fields like: struct Foo { field1: Type1, field2: Type2 }
-                    Ok(fields_named.named.iter().collect::<Vec<_>>())
-                }
-                syn::Fields::Unnamed(_fields_unnamed) => Err(syn::Error::new_spanned(
-                    &input,
-                    "Interpret can only be derived for structs with named fields",
-                )),
-                syn::Fields::Unit => {
-                    // For unit structs like: struct Foo;
-                    Ok(Vec::new())
-                }
-            }
-        }
-        _ => {
-            // Not a struct - return a compile error
-            Err(syn::Error::new_spanned(
-                &input,
-                "Interpret can only be derived for structs with named fields.",
-            ))
-        }
-    }
-}
-
-pub fn extract_members(fields: &Vec<&syn::Field>) -> syn::Result<Vec<String>> {
-    let mut combined_error: Option<syn::Error> = None;
-    let mut member_strings: Vec<String> = Vec::new();
-
-    for f in fields {
-        let mut current_error: Option<syn::Error> = None;
-        let member_ident: Option<String>;
-        let member_dtype: Option<Type>;
-        let member_sizing: Option<Sizing>;
-
-        member_ident = accumulate_syn_result(
-&mut current_error, 
-            get_member_ident(f)
-        );
-        member_sizing = accumulate_syn_result(
-            &mut current_error, 
-            get_member_sizing(f)
-        );
-        member_dtype = accumulate_syn_result(
-            &mut current_error, 
-            get_member_type(f)
-        );
-        
-        match current_error {
-            None => {
-               let member_string = format!(
-                    "{}: {}{}",
-                    member_ident.unwrap(),
-                    member_dtype.unwrap(),
-                    member_sizing.unwrap(),
-               );
-               member_strings.push(member_string); 
-            },
-            Some(err) => {
-                accumulate_errors(
-                    &mut combined_error, 
-                    Some(err)
-                );
-            },
-        }
-    }
-
-    match combined_error {
-        Some(err) => syn::Result::Err(err),
-        None => syn::Result::Ok(member_strings)
-    }
-}
-
-
-
-
-
-fn get_member_ident(field: &syn::Field) -> syn::Result<String> {
-    match field.ident.as_ref() {
-        Some(ident) => {
-            if !ident.to_string().chars().next().unwrap().is_alphabetic() {
-                syn::Result::Err(syn::Error::new_spanned(
-                    field,
-                    format!(
-                        "The identifier '{}' is invalid. Identifiers must start with an alphabetical character.",
-                        ident,
-                    )
-                )) 
-            }
-            else {
-                syn::Result::Ok(ident.to_string())
-            }
-        },
-        None => syn::Result::Err(syn::Error::new_spanned(
-            field,
-            "Field does not have an identifier.",
-        )),
-    }
-}
-
-fn get_member_sizing(field: &syn::Field) -> syn::Result<Sizing> {
-    match &field.ty {
-        syn::Type::Array(arr) => { 
-            match &arr.len {
-                syn::Expr::Lit(lit_expr) => {
-                    match &lit_expr.lit {
-                        syn::Lit::Int(lit_int) => {
-                            match lit_int.base10_parse::<usize>() {
-                                Ok(n) => syn::Result::Ok(Sizing::Fixed(n)),
-                                Err(_) => {
-                                    syn::Result::Err(
-                                        syn::Error::new_spanned(
-                                            &arr.len,
-                                            "Could not interpret expression as a literal integer.",
-                                        )
-                                    )
-                                }
-                            }
-                        },
-                        _ => {
-                            syn::Result::Err(
-                                syn::Error::new_spanned(
-                                    &arr.len,
-                                    "Unexpected expression, Interpret can only be derive fixed arrays with literal integer expressions.",
-                                )
-                            ) 
-                        }
-                    }
-                },
-                _ => { 
-                    syn::Result::Err(
-                        syn::Error::new_spanned(
-                            &arr.len,
-                            "Unexpected expression, Interpret can only be derive fixed arrays with literal integer expressions.",
-                        )
-                    )
-                }
-            }
-        },
-        // syn::Type::Array(arr) => {
-        //     let len: Result<usize> = match &arr.len {
-        //         syn::Expr::Lit(lit_expr) => match &lit_expr.lit {
-        //             syn::Lit::Int(int_lit) => {
-        //                 match int_lit.base10_parse::<usize>() {
-        //                     Ok(parsed_int) => { syn::Result::Ok(Sizing::Fixed(parsed_int)) },
-        //                     Err(error) => { unimplemented!("TODO") },
-        //                 }
-        //                 todo!();
-        //                 // .expect("Failed to parse array length")
-        //             },
-        //             _ => panic!("Array length must be an integer literal"),
-        //         },
-        //         _ => {
-        //             syn::Result::Err(
-        //                 syn::Error::new_spanned(
-        //                     &field.ty, 
-        //                     "Must use literal expression in array length for derived interpretter.",
-        //                 )
-        //             )
-        //         }
-        //     }
-        //     // syn::Result::Ok(Sizing::Fixed(len))
-        // }
-        syn::Type::Path(_type_path) => {
-            // This probably needs to look for vectors.
-            // unimplemented!("Implement regular types");
-            syn::Result::Ok(Sizing::Singleton)
-        },
-        _ => {
-            panic!("Unexpected sizing when deriving interpret");
-        }
-    }
-}
-
-fn get_member_type(field: &syn::Field) -> syn::Result<Type> {
-    match &field.ty {
-        syn::Type::Path(type_path) => {
-            extract_type_from_type_path(&field.ty, type_path)
-        }
-        syn::Type::Array(arr) => {
-            match &*arr.elem {
-                syn::Type::Path(type_path) => {
-                    extract_type_from_type_path(&field.ty, type_path)
-                },
-                _ => {
-                    syn::Result::Err(
-                    syn::Error::new_spanned(
-                        arr,
-                        "Type associated with field is not included in the list of allowable primitive types.")) 
-                },
-            }
-        },
-        // syn::Type::Reference(type_ref) => {
-        //     // Handle &str specifically
-        //     unimplemented!("References for &str are not implemented.")
-        // }
-        _ => { panic!("Panic! At the field type") },
-    }
-}
-
-fn extract_type_from_type_path(
-    context: &syn::Type,
-    type_path: &syn::TypePath,
-) -> syn::Result<Type> {
-    let segment = type_path.path.segments.last().unwrap();
-    let segment_type = match segment.ident.to_string().as_str() {
-        "u8" => syn::Result::Ok(Type::Byte),
-        "u16" => syn::Result::Ok(Type::UnsignedInteger16),
-        "u32" => syn::Result::Ok(Type::UnsignedInteger32),
-        "u64" => syn::Result::Ok(Type::UnsignedInteger64),
-        "i8" => syn::Result::Ok(Type::SignedInteger8),
-        "i16" => syn::Result::Ok(Type::SignedInteger16),
-        "i32" => syn::Result::Ok(Type::SignedInteger32),
-        "i64" => syn::Result::Ok(Type::SignedInteger64),
-        "f32" => syn::Result::Ok(Type::Float32),
-        "f64" => syn::Result::Ok(Type::Float64),
-        "String" => syn::Result::Ok(Type::Str),
-        "Vec" => extract_vec_type_arg(context, type_path),
-        unexpected => create_syn_err(
-            context, 
-            format!("Unexpected field type: '{}'", unexpected)
-        ),
-    };
-    segment_type
-}
-
-fn extract_vec_type_arg(
-    context: &syn::Type,
-    type_path: &syn::TypePath,
-) -> syn::Result<Type> {
-    let segment = type_path.path.segments.last().unwrap();
-    let segment_type = match segment.ident.to_string().as_str() { 
-        "Vec" => {
-            match &segment.arguments {
-                syn::PathArguments::AngleBracketed(angled) => {
-                    match angled.args.first() {
-                        None => panic!("There should be a type!"),
-                        Some(gen_arg) => {
-                            match gen_arg {
-                                syn::GenericArgument::Type(ty) => {
-                                    match ty {
-                                        syn::Type::Path(type_path) => {
-                                            extract_primitive_type_from_type_path(context, type_path)
-                                        },
-                                        _ => unreachable!("This isn't valid syntax"),
-                                    }
-                                },
-                                _ => unreachable!("This isn't a type, how did you do this?"),
-                            }
-                        }
-                    }
-                },
-                _ => todo!("Raise syn error for non angled args"),
-            }
-        },
-        _ => unreachable!("How did I get here???"),
-    };
-    segment_type
-}
-
-fn extract_primitive_type_from_type_path(
-    context: &syn::Type,
-    type_path: &syn::TypePath,
-) -> syn::Result<Type> {
-    let segment = type_path.path.segments.last().unwrap();
-    // match type_path.path.segments.last() {
-    //     None
-    // }
-    match segment.ident.to_string().as_str() {
-        "u8" => syn::Result::Ok(Type::Byte),
-        "u16" => syn::Result::Ok(Type::UnsignedInteger16),
-        "u32" => syn::Result::Ok(Type::UnsignedInteger32),
-        "u64" => syn::Result::Ok(Type::UnsignedInteger64),
-        "i8" => syn::Result::Ok(Type::SignedInteger8),
-        "i16" => syn::Result::Ok(Type::SignedInteger16),
-        "i32" => syn::Result::Ok(Type::SignedInteger32),
-        "i64" => syn::Result::Ok(Type::SignedInteger64),
-        "f32" => syn::Result::Ok(Type::Float32),
-        "f64" => syn::Result::Ok(Type::Float64),
-        "String" => syn::Result::Ok(Type::Str),
-        unexpected => create_syn_err(
-            context, 
-            format!("Unexpected field type: '{}'", unexpected),
-        ),
-    }
-}
-
-fn create_syn_err<T, U, V>(
+fn syn_err<T, U, V>(
     tokens: T,
     message: U,
 ) -> syn::Result<V>
@@ -418,53 +345,94 @@ where
         syn::Error::new_spanned(tokens, message)
     )
 }
-// // fn make_syn_err(context: )
-// fn accumulate_syn_error(accumulated: mut Option<syn::Error>, newest: Option<syn::Error>) -> Option<syn::Error> {
-//     match (accumulated, newest)  {
-//         (acc, None) => acc.take(),
 
-//         (_, _) => todo!("Not implemented yet."),
-//         // (None, _) => accumulated,
-//         // (Some(newest), None) => Some(newest),
-//         // (Some(newest), Some(accumulated)) => accumulated.combine(newest),
-//     }
-// }
-
-// fn accumulate_syn_error(accumulated: &Option<syn::Error>, newest: &Option<syn::Error>) -> Option<syn::Error> {
-//     match (&accumulated, &newest) {
-//         (Some(acc), None) => Some(acc.clone()),
-//         (None, Some(new)) => Some(new.clone()),
-//         (Some(acc), Some(new)) => {
-//             acc.clone().combine(new.clone());
-//             Some(acc.clone())
-//         },
-//         (None, None) => None,
-//     }
-// }
-
-fn accumulate_errors(
-    accumulated: &mut Option<syn::Error>,
-    newest: Option<syn::Error>
-) {
-    match (accumulated.as_mut(), newest) {
-        (None, None) => {}
-        (None, Some(err)) => *accumulated = Some(err),
-        (Some(_), None) => {}
-        (Some(acc), Some(new)) => {
-            acc.combine(new);
-        }
+fn get_last_type_path_segment(
+    type_path: &syn::TypePath,
+) -> syn::Result<&syn::PathSegment> {
+    match type_path.path.segments.last() {
+        Some(segment) => syn::Result::Ok(segment),
+        None => todo!("Raise error - no segments?"),
     }
 }
 
-fn accumulate_syn_result<T>(
-    accumulated: &mut Option<syn::Error>,
-    result: syn::Result<T>
-) -> Option<T> {
-    match result {
-        Ok(value) => Some(value),
-        Err(err) => {
-            accumulate_errors(accumulated, Some(err));
-            None
-        }
+fn get_type_path_from_vec_args(
+    path_segment: &syn::PathSegment,
+) -> syn::Result<&syn::TypePath> {
+    if path_segment.ident.to_string() != "Vec" {
+        syn_err(
+            path_segment,
+            format!("Expected a Vec, got '{}'", path_segment.ident),
+        )?
+    }
+    match &path_segment.arguments {
+        syn::PathArguments::AngleBracketed(angled_args) => {
+            if angled_args.args.first().is_none() {
+                syn_err(angled_args, "No arguments supplied to Vec.")?
+            }
+            match &angled_args.args.first().unwrap() {
+                syn::GenericArgument::Type(type_) => {
+                    match type_ {
+                        syn::Type::Path(type_path) => syn::Result::Ok(type_path),
+                        _ => syn_err(
+                            type_,
+                            "Unexpected type format, expected a type path"
+                        )
+                    }
+                },
+                _ => syn_err(
+                    angled_args,
+                    "Unexpected arguments to Vec"
+                )
+            }
+        },
+        _ => syn_err(
+            &path_segment.arguments,
+            "Path segment must have arguments in angled brackets"
+        ),
     }
 }
+
+pub fn derive_interpret(item: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    let context: syn::DeriveInput = match syn::parse2(item) {
+        Ok(input) => input,
+        Err(e) => return e.to_compile_error(),
+    };
+
+    let interpret = match InterpretStruct::new(context) {
+        Ok(i) => i,
+        Err(e) => return e.to_compile_error(),
+    };
+
+    quote::quote! { #interpret }
+}
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use proc_macro2::TokenStream;
+//     use quote::quote;
+
+//     #[test]
+//     fn test_my_macro_logic() {
+//         let input = quote! {
+//             struct MyStruct {
+//                 field: i32,
+//             }
+//         };
+        
+//         let expected = quote! {
+//             struct MyStruct {
+//                 field: i32,
+//             }
+            
+//             impl MyStruct {
+//                 fn new() -> Self {
+//                     Self { field: 0 }
+//                 }
+//             }
+//         };
+        
+//         let result = my_macro_impl(input);
+//         assert_eq!(result.to_string(), expected.to_string());
+//     }
+// }

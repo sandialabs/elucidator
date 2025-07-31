@@ -1,5 +1,5 @@
 extern crate proc_macro;
-mod interpret_macro_2;
+mod interpret_macro;
 
 use proc_macro::TokenStream;
 use std::fmt;
@@ -351,10 +351,5 @@ pub fn make_dtype_interpreter(item: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(Interpret)]
 pub fn derive_interpret(item: TokenStream) -> TokenStream {
-    let context = parse_macro_input!(item as DeriveInput);
-    let interpret = match interpret_macro_2::InterpretStruct::new(context) {
-        Ok(i) => i,
-        Err(e) => return e.to_compile_error().into(),
-    };
-    quote! { #interpret }.into()
+    interpret_macro::derive_interpret(item.into()).into()
 }
