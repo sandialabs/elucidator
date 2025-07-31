@@ -32,6 +32,15 @@ enum Type {
     Str,
 }
 
+struct InterpretStruct {
+    fields: Vec<Field>
+}
+
+struct Field {
+    field_type: Type,
+    field_sizing: Sizing,
+}
+
 
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -49,6 +58,19 @@ impl fmt::Display for Type {
             Type::Str => "String",
         };
         write!(f, "{}", type_str)
+    }
+}
+
+impl TryFrom<&syn::Type> for Type {
+    type Error = syn::Error;
+
+    fn try_from(value: &syn::Type) -> Result<Self, Self::Error> {
+        match value {
+            syn::Type::Array(type_array) => { todo!() },
+
+            _ => todo!(),
+        }
+        todo!();
     }
 }
 
@@ -314,34 +336,11 @@ fn extract_type_from_type_path(
         "f32" => syn::Result::Ok(Type::Float32),
         "f64" => syn::Result::Ok(Type::Float64),
         "String" => syn::Result::Ok(Type::Str),
-        "Vec" => {
-            match &segment.arguments {
-                syn::PathArguments::None => panic!("No args?"),
-                syn::PathArguments::Parenthesized(_) => panic!("Not sure how we got there"),
-                syn::PathArguments::AngleBracketed(angled) => {
-                    match angled.args.first() {
-                        None => panic!("There should be a type!"),
-                        Some(gen_arg) => {
-                            match gen_arg {
-                                syn::GenericArgument::Type(ty) => {
-                                    match ty {
-                                        syn::Type::Path(type_path) => todo!("Implement path"),
-                                        _ => unreachable!("This isn't valid syntax"),
-                                    }
-                                },
-                                _ => unreachable!("This isn't a type, how did you do this?"),
-                            }
-                        }
-                    }
-                    panic!("This is what we expect!")
-                }
-            }
-            syn::Result::Ok(Type::Str)
-        },
-        unexpected => syn::Result::Err(syn::Error::new_spanned(
-            context,
+        "Vec" => extract_vec_type_arg(context, type_path),
+        unexpected => create_syn_err(
+            context, 
             format!("Unexpected field type: '{}'", unexpected)
-        )),
+        ),
     };
     segment_type
 }
@@ -400,14 +399,14 @@ fn extract_primitive_type_from_type_path(
         "f32" => syn::Result::Ok(Type::Float32),
         "f64" => syn::Result::Ok(Type::Float64),
         "String" => syn::Result::Ok(Type::Str),
-        unexpected => create_syn_err_result(
+        unexpected => create_syn_err(
             context, 
             format!("Unexpected field type: '{}'", unexpected),
         ),
     }
 }
 
-fn create_syn_err_result<T, U, V>(
+fn create_syn_err<T, U, V>(
     tokens: T,
     message: U,
 ) -> syn::Result<V>

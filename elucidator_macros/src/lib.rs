@@ -1,5 +1,5 @@
 extern crate proc_macro;
-mod interpret_macro;
+mod interpret_macro_2;
 
 use proc_macro::TokenStream;
 use std::fmt;
@@ -351,30 +351,10 @@ pub fn make_dtype_interpreter(item: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(Interpret)]
 pub fn derive_interpret(item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as DeriveInput);
-    let name = &input.ident;
-
-    let fields = match interpret_macro::extract_fields(&input) {
-        Ok(fields) => fields,
-        Err(error) => return error.to_compile_error().into(),
+    let context = parse_macro_input!(item as DeriveInput);
+    let interpret = match interpret_macro_2::InterpretStruct::new(context) {
+        Ok(i) => i,
+        Err(e) => return e.to_compile_error().into(),
     };
-
-    let members = interpret_macro::extract_members(&fields);
-
-    let member_string = match members {
-        Ok(strings) => strings.join(", "),
-        Err(error) => return error.to_compile_error().into(),
-    };
-
-
-    let impl_block = quote! {
-        impl Interpret for #name {
-            fn get_spec() -> DesignationSpecification {
-                DesignationSpecification::from_text(#member_string).unwrap()
-            }
-            fn from_eluciblob() -> Result<Self, ElucidatorError> { todo!("Derived implementation of from_eluciblob not implemented.") }
-            fn to_eluciblob() -> Result<Self, ElucidatorError> { todo!("Derived implementation of to_eluciblob not implemented.") }
-        }
-    }.to_token_stream();
-    impl_block.into()
+    quote! { #interpret }.into()
 }

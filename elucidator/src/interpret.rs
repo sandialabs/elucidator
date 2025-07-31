@@ -1,10 +1,21 @@
 use crate::designation::DesignationSpecification;
 use crate::error::ElucidatorError;
 
+use elucidator_macros::Interpret;
+
 pub trait Interpret: Sized {
     fn get_spec() -> DesignationSpecification;
     fn from_eluciblob() -> Result<Self, ElucidatorError>;
     fn to_eluciblob() -> Result<Self, ElucidatorError>;
+}
+
+#[derive(Interpret)]
+struct MyNewPoint<'a> {
+    x: u8,
+    y: Vec<u8>,
+    z: String,
+    w: [f32; 16],
+    a: str,
 }
 
 #[cfg(test)]
@@ -15,7 +26,7 @@ mod test {
     #[derive(Interpret, Debug, Clone)]
     struct MyPoint {
         x: u8,
-        y: Vec<u8>,
+        y: u8,
     }
 
     #[derive(Interpret, Debug, Clone)]
