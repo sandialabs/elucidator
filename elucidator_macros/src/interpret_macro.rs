@@ -406,33 +406,31 @@ pub fn derive_interpret(item: proc_macro2::TokenStream) -> proc_macro2::TokenStr
     quote::quote! { #interpret }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use proc_macro2::TokenStream;
-//     use quote::quote;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quote::quote;
+    
+    #[test]
+    fn test_my_macro_logic_str() {
+        let input = quote! {
+            struct MyStruct {
+                field: i32,
+            }
+        };
+        
+        let result = derive_interpret(input);
+        let generated = result.to_string();
+        assert!(generated.contains("impl Interpret for MyStruct"));
+    }
 
-//     #[test]
-//     fn test_my_macro_logic() {
-//         let input = quote! {
-//             struct MyStruct {
-//                 field: i32,
-//             }
-//         };
+    #[test]
+    fn test_valid_identifier() {
+        let ident: syn::Ident = syn::parse_quote!(valid_name);
+        let result = Identifier::try_from(&ident);
         
-//         let expected = quote! {
-//             struct MyStruct {
-//                 field: i32,
-//             }
-            
-//             impl MyStruct {
-//                 fn new() -> Self {
-//                     Self { field: 0 }
-//                 }
-//             }
-//         };
-        
-//         let result = my_macro_impl(input);
-//         assert_eq!(result.to_string(), expected.to_string());
-//     }
-// }
+        assert!(result.is_ok());
+        let identifier = result.unwrap();
+        assert_eq!(identifier.ident, "valid_name");
+    }
+}
