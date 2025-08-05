@@ -1,12 +1,10 @@
 extern crate proc_macro;
-mod interpret_macro;
+mod interpret;
 
 use proc_macro::TokenStream;
 use std::fmt;
 
 use quote::{quote, ToTokens};
-use syn::*;
-
 #[derive(PartialEq)]
 struct Primitive {
     first_char: char,
@@ -347,9 +345,7 @@ pub fn make_dtype_interpreter(item: TokenStream) -> TokenStream {
 /// Derived macro logic
 /// vvvvvvvvvvvvvvvvvvv
 
-
-
 #[proc_macro_derive(Interpret)]
 pub fn derive_interpret(item: TokenStream) -> TokenStream {
-    interpret_macro::derive_interpret(item.into()).into()
+    interpret::derive_interpret2(item.into()).into()
 }

@@ -11,3 +11,7 @@ syn = { version = "2.0.68", features = ["extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0.86"
 
+[dev-dependencies]
+proc-macro2 = { version = "1.0.86", features = ["span-locations"] }
+
+
