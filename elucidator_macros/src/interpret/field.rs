@@ -18,6 +18,9 @@ pub struct Field {
     field_sizing: Sizing,
 }
 
+#[cfg(test)]
+/// Implements helper functions for internal access during testing in
+/// parent objects.
 impl Field {
     /// Returns the field's identifier.
     pub fn get_ident(&self) -> &Identifier {
@@ -54,7 +57,7 @@ impl TryFrom<&syn::Field> for Field {
             syn::Type::Array(syn::TypeArray { elem, .. }) => PrimitiveType::try_from(elem.as_ref()),
             syn::Type::Path(type_path) => {
                 let last_segment = get_last_type_path_segment(type_path)?;
-                if last_segment.ident.to_string() == "Vec" {
+                if last_segment.ident == "Vec" {
                     let vec_inner_type = get_type_path_from_vec_args(last_segment)?;
                     PrimitiveType::try_from(vec_inner_type)
                 } else {

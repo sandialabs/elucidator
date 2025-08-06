@@ -1,4 +1,4 @@
-use super::interpret::InterpretStruct;
+use super::interpret_struct::InterpretStruct;
 
 pub fn derive_interpret2(item: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let context: syn::DeriveInput = match syn::parse2(item) {

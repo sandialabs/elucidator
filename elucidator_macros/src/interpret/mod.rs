@@ -3,7 +3,7 @@ mod utils;
 
 mod field;
 mod identifier;
-mod interpret;
+mod interpret_struct;
 mod primitive_type;
 mod sizing;
 

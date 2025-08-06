@@ -136,7 +136,7 @@ pub fn representable_primitive_impl(item: TokenStream) -> TokenStream {
             panic!("make_representable_impl must be a valid path")
         }
     };
-    let last_ident = &in_path.path.segments.iter().last().unwrap().ident;
+    let last_ident = &in_path.path.segments.iter().next_back().unwrap().ident;
     // println!("{last_ident:#?}");
     let string_repr = format!("{last_ident}");
     let this_primitive = Primitive::from(string_repr.as_str());
@@ -216,7 +216,7 @@ pub fn representable_vec_impl(item: TokenStream) -> TokenStream {
             panic!("make_representable_impl must be a valid path")
         }
     };
-    let last_ident = &in_path.path.segments.iter().last().unwrap().ident;
+    let last_ident = &in_path.path.segments.iter().next_back().unwrap().ident;
     // println!("{last_ident:#?}");
     let string_repr = format!("{last_ident}");
     let string_repr_arr = format!("{last_ident} array");
@@ -307,7 +307,7 @@ pub fn make_dtype_interpreter(item: TokenStream) -> TokenStream {
             panic!("make_representable_impl must be a valid path")
         }
     };
-    let last_ident = &in_path.path.segments.iter().last().unwrap().ident;
+    let last_ident = &in_path.path.segments.iter().next_back().unwrap().ident;
     let signature: proc_macro2::TokenStream = format!(
         "fn interpret_{last_ident}(
             cursor: &mut Cursor<&[u8]>,
@@ -342,8 +342,8 @@ pub fn make_dtype_interpreter(item: TokenStream) -> TokenStream {
     buffer_conversion.into()
 }
 
-/// Derived macro logic
-/// vvvvvvvvvvvvvvvvvvv
+// Derived macro logic
+// vvvvvvvvvvvvvvvvvvv
 
 #[proc_macro_derive(Interpret)]
 pub fn derive_interpret(item: TokenStream) -> TokenStream {

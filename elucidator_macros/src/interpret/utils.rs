@@ -38,7 +38,7 @@ pub fn get_last_type_path_segment(type_path: &syn::TypePath) -> syn::Result<&syn
 }
 
 pub fn get_type_path_from_vec_args(path_segment: &syn::PathSegment) -> syn::Result<&syn::TypePath> {
-    if path_segment.ident.to_string() != "Vec" {
+    if path_segment.ident != "Vec" {
         syn_err(
             path_segment,
             format!("Expected a Vec, got '{}'", path_segment.ident),

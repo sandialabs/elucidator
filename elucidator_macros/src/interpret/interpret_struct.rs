@@ -12,8 +12,7 @@ impl InterpretStruct {
         let ident = Identifier::try_from(&context.ident);
         let fields: syn::Result<Vec<Field>> = match &context.data {
             syn::Data::Struct(syn::DataStruct { fields, .. }) => {
-                let fields: Vec<syn::Result<Field>> =
-                    fields.iter().map(|f| Field::try_from(f)).collect();
+                let fields: Vec<syn::Result<Field>> = fields.iter().map(Field::try_from).collect();
                 match combine_result_errors(&fields) {
                     Some(e) => syn::Result::Err(e),
                     None => syn::Result::Ok(fields.into_iter().map(syn::Result::unwrap).collect()),
