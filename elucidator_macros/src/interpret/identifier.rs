@@ -1,4 +1,4 @@
-use crate::interpret::utils::{syn_err, combine_result_errors};
+use crate::interpret::utils::{combine_result_errors, syn_err};
 
 /// Intermediate representation of an identifier in Rust for the Interpret
 /// procedural macro. The internal fields of the struct consists of easy to use
@@ -6,11 +6,11 @@ use crate::interpret::utils::{syn_err, combine_result_errors};
 #[derive(Clone)]
 pub struct Identifier {
     /// String representation of an identifier
-    ident: String
+    ident: String,
 }
 
 impl std::fmt::Display for Identifier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { 
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.ident)
     }
 }
@@ -29,8 +29,8 @@ impl TryFrom<&syn::Ident> for Identifier {
             Ok(())
         } else {
             syn_err(
-                value, 
-                "Identifier must only contain alphanumeric or underscore characters."
+                value,
+                "Identifier must only contain alphanumeric or underscore characters.",
             )
         };
         match combine_result_errors(&[first_alphabetic, all_alphanumeric]) {
@@ -50,12 +50,12 @@ impl quote::ToTokens for Identifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_alphabetic_ok() {
         let ident: syn::Ident = syn::parse_quote!(valid_name);
         let result = Identifier::try_from(&ident);
-        
+
         assert!(result.is_ok());
         let identifier = result.unwrap();
         assert_eq!(identifier.ident, "valid_name");
@@ -65,23 +65,29 @@ mod tests {
     fn test_alphanumeric_ok() {
         let ident: syn::Ident = syn::parse_quote!(valid_name_123);
         let result = Identifier::try_from(&ident);
-        
+
         assert!(result.is_ok());
         let identifier = result.unwrap();
         assert_eq!(identifier.ident, "valid_name_123");
     }
 
-   
     #[test]
     fn test_underscore_first_fails() {
         let ident: syn::Ident = syn::parse_quote!(_valid_name_123);
         let result = Identifier::try_from(&ident);
-        
-        assert!(result.is_err(), "Identifier '{}' should have failed, but did unexpectedly succeeded.", ident.to_string());
+
+        assert!(
+            result.is_err(),
+            "Identifier '{}' should have failed, but did unexpectedly succeeded.",
+            ident.to_string()
+        );
         let error = result.err().unwrap();
-        assert_eq!("Identifier must start with an alphabetic character.", error.to_string());
+        assert_eq!(
+            "Identifier must start with an alphabetic character.",
+            error.to_string()
+        );
     }
-  
+
     // Note:
     //
     // Testing failure behavior for when identifier starts with number is not necessary

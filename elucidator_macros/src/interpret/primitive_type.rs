@@ -1,5 +1,5 @@
-use std::fmt;
 use super::utils::{get_last_type_path_segment, syn_err};
+use std::fmt;
 
 /// Intermediate representation of an a type in Rust for the Interpret
 /// procedural macro. The internal enum consists of easy to use variants
@@ -47,10 +47,7 @@ impl TryFrom<String> for PrimitiveType {
     type Error = syn::Error;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let last_segment = value
-            .split("::")
-            .last()
-            .unwrap_or(value.as_str());
+        let last_segment = value.split("::").last().unwrap_or(value.as_str());
         match last_segment {
             "u8" => syn::Result::Ok(PrimitiveType::Byte),
             "u16" => syn::Result::Ok(PrimitiveType::UnsignedInteger16),
@@ -64,9 +61,9 @@ impl TryFrom<String> for PrimitiveType {
             "f64" => syn::Result::Ok(PrimitiveType::Float64),
             "String" => syn::Result::Ok(PrimitiveType::Str),
             unexpected => syn_err(
-                value.clone(), 
-                format!("'{}' is not an Elucidator primitive type", unexpected)
-            ), 
+                value.clone(),
+                format!("'{}' is not an Elucidator primitive type", unexpected),
+            ),
         }
     }
 }
@@ -80,11 +77,14 @@ impl TryFrom<&syn::TypePath> for PrimitiveType {
 
         let syn::PathArguments::None = segment.arguments else {
             syn_err(
-                value, 
-                format!("'{}' is not an Elucidator primitive type", segment_type.as_str())
+                value,
+                format!(
+                    "'{}' is not an Elucidator primitive type",
+                    segment_type.as_str()
+                ),
             )?
         };
-        
+
         PrimitiveType::try_from(segment_type)
     }
 }
@@ -814,60 +814,60 @@ mod tests {
 
     mod display {
         use super::*;
-        
+
         #[test]
         fn u8_ok() {
             assert_eq!(PrimitiveType::Byte.to_string(), "u8");
         }
-    
+
         #[test]
         fn u16_ok() {
             assert_eq!(PrimitiveType::UnsignedInteger16.to_string(), "u16");
         }
-    
+
         #[test]
         fn u32_ok() {
             assert_eq!(PrimitiveType::UnsignedInteger32.to_string(), "u32");
         }
-    
+
         #[test]
         fn u64_ok() {
             assert_eq!(PrimitiveType::UnsignedInteger64.to_string(), "u64");
         }
-    
+
         #[test]
         fn i8_ok() {
             assert_eq!(PrimitiveType::SignedInteger8.to_string(), "i8");
         }
-    
+
         #[test]
         fn i16_ok() {
             assert_eq!(PrimitiveType::SignedInteger16.to_string(), "i16");
         }
-    
+
         #[test]
         fn i32_ok() {
             assert_eq!(PrimitiveType::SignedInteger32.to_string(), "i32");
         }
-    
+
         #[test]
         fn i64_ok() {
             assert_eq!(PrimitiveType::SignedInteger64.to_string(), "i64");
         }
-    
+
         #[test]
         fn f32_ok() {
             assert_eq!(PrimitiveType::Float32.to_string(), "f32");
         }
-    
+
         #[test]
         fn f64_ok() {
             assert_eq!(PrimitiveType::Float64.to_string(), "f64");
         }
-    
+
         #[test]
         fn string_ok() {
             assert_eq!(PrimitiveType::Str.to_string(), "String");
-        } 
+        }
     }
 }

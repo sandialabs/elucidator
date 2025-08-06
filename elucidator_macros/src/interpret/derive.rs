@@ -18,7 +18,7 @@ pub fn derive_interpret2(item: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 mod tests {
     use super::*;
     use quote::quote;
-    
+
     #[test]
     fn test_my_macro_logic_str() {
         let input = quote! {
@@ -26,7 +26,7 @@ mod tests {
                 field: i32,
             }
         };
-        
+
         let result = derive_interpret2(input);
         let generated = result.to_string();
         assert!(generated.contains("impl Interpret for MyStruct"));

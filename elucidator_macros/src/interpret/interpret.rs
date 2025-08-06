@@ -1,6 +1,6 @@
-use super::identifier::Identifier;
 use super::field::Field;
-use super::utils::{syn_err, combine_result_errors, combine_option_errors};
+use super::identifier::Identifier;
+use super::utils::{combine_option_errors, combine_result_errors, syn_err};
 
 pub struct InterpretStruct {
     ident: Identifier,
@@ -11,29 +11,22 @@ impl InterpretStruct {
     pub fn new(context: syn::DeriveInput) -> syn::Result<Self> {
         let ident = Identifier::try_from(&context.ident);
         let fields: syn::Result<Vec<Field>> = match &context.data {
-            syn::Data::Struct(syn::DataStruct {fields, ..} ) => {
-                let fields: Vec<syn::Result<Field>> = fields
-                    .iter()
-                    .map(|f| Field::try_from(f))
-                    .collect();
+            syn::Data::Struct(syn::DataStruct { fields, .. }) => {
+                let fields: Vec<syn::Result<Field>> =
+                    fields.iter().map(|f| Field::try_from(f)).collect();
                 match combine_result_errors(&fields) {
                     Some(e) => syn::Result::Err(e),
                     None => syn::Result::Ok(fields.into_iter().map(syn::Result::unwrap).collect()),
                 }
             }
-            _ => {
-                syn_err(
-                    &context,
-                    "`Interpret` can only be derived on structs"
-                )
-            }
+            _ => syn_err(&context, "`Interpret` can only be derived on structs"),
         };
         let check_no_generics = if context.generics.params.is_empty() {
             syn::Result::Ok(())
         } else {
             syn_err(
                 &context,
-                "deriving `Interpret` is not supported with generic parameters"
+                "deriving `Interpret` is not supported with generic parameters",
             )
         };
 
@@ -43,12 +36,10 @@ impl InterpretStruct {
             check_no_generics.clone().err(),
         ]) {
             Some(e) => syn::Result::Err(e),
-            None => {
-                syn::Result::Ok(Self {
-                    ident: ident.unwrap(),
-                    fields: fields.unwrap(),
-                })
-            }
+            None => syn::Result::Ok(Self {
+                ident: ident.unwrap(),
+                fields: fields.unwrap(),
+            }),
         }
     }
 
@@ -81,8 +72,8 @@ impl quote::ToTokens for InterpretStruct {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::sizing::Sizing;
+    use super::*;
 
     #[test]
     fn test_new_ok() {
@@ -109,10 +100,10 @@ mod tests {
     #[test]
     fn test_ident_ok() {
         let context: syn::DeriveInput = syn::parse_quote!(
-            struct MyFoo { }
+            struct MyFoo {}
         );
         let result = InterpretStruct::new(context);
-        
+
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.ident.to_string(), "MyFoo");
@@ -137,7 +128,8 @@ mod tests {
             }
         );
         let interpret = InterpretStruct::new(context).unwrap();
-        let field_names: Vec<String> = interpret.fields
+        let field_names: Vec<String> = interpret
+            .fields
             .iter()
             .map(|f| f.get_ident().to_string())
             .collect();
@@ -166,14 +158,12 @@ mod tests {
             }
         );
         let interpret = InterpretStruct::new(context).unwrap();
-        let field_types: Vec<String> = interpret.fields
+        let field_types: Vec<String> = interpret
+            .fields
             .iter()
             .map(|f| f.get_field_type().to_string())
             .collect();
-        assert_eq!(
-            field_types,
-            vec!["u8", "u16", "i32", "u8", "u16", "i32"]
-        );
+        assert_eq!(field_types, vec!["u8", "u16", "i32", "u8", "u16", "i32"]);
     }
 
     #[test]
@@ -195,15 +185,20 @@ mod tests {
             }
         );
         let interpret = InterpretStruct::new(context).unwrap();
-        let field_sizes: Vec<Sizing> = interpret.fields
+        let field_sizes: Vec<Sizing> = interpret
+            .fields
             .iter()
             .map(|f| f.get_field_sizing().clone())
             .collect();
         assert_eq!(
             field_sizes,
             vec![
-                Sizing::Singleton, Sizing::Fixed(4), Sizing::Dynamic, 
-                Sizing::Singleton, Sizing::Fixed(4), Sizing::Dynamic, 
+                Sizing::Singleton,
+                Sizing::Fixed(4),
+                Sizing::Dynamic,
+                Sizing::Singleton,
+                Sizing::Fixed(4),
+                Sizing::Dynamic,
             ]
         );
     }
@@ -254,7 +249,7 @@ mod tests {
         let context: syn::DeriveInput = syn::parse_quote!(
             enum MyFoo {
                 /// Foo field
-                FOo
+                FOo,
             }
         );
         let interpret = InterpretStruct::new(context);
@@ -265,6 +260,4 @@ mod tests {
             "`Interpret` can only be derived on structs"
         );
     }
-
-     
 }

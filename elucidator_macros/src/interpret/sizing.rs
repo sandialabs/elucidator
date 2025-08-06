@@ -153,7 +153,10 @@ mod tests {
 
         assert!(result.is_err());
         let error = result.err().unwrap();
-        assert_eq!(error.to_string(), "array size must be a non-negative integer literal");
+        assert_eq!(
+            error.to_string(),
+            "array size must be a non-negative integer literal"
+        );
     }
 
     #[test]
@@ -163,7 +166,10 @@ mod tests {
 
         assert!(result.is_err());
         let error = result.err().unwrap();
-        assert_eq!(error.to_string(), "array size must be a non-negative integer literal");
+        assert_eq!(
+            error.to_string(),
+            "array size must be a non-negative integer literal"
+        );
     }
 
     #[test]
@@ -173,7 +179,10 @@ mod tests {
 
         assert!(result.is_err());
         let error = result.err().unwrap();
-        assert_eq!(error.to_string(), "array size must be a non-negative integer literal");
+        assert_eq!(
+            error.to_string(),
+            "array size must be a non-negative integer literal"
+        );
     }
 
     #[test]
@@ -183,7 +192,10 @@ mod tests {
 
         assert!(result.is_err());
         let error = result.err().unwrap();
-        assert_eq!(error.to_string(), "array size must be a non-negative integer literal");
+        assert_eq!(
+            error.to_string(),
+            "array size must be a non-negative integer literal"
+        );
     }
 
     #[test]
@@ -210,7 +222,7 @@ mod tests {
     fn test_dynamic_ok() {
         let syn_type: syn::Type = syn::parse_quote!(Vec<u8>);
         let result = Sizing::try_from(&syn_type);
-        
+
         assert!(result.is_ok());
         let sizing = result.unwrap();
         assert_eq!(sizing, Sizing::Dynamic);
@@ -227,5 +239,5 @@ mod tests {
             error.to_string(),
             "Interpret requires primitives, a vector, or an array with a non-negative integer literal to determine sizing"
         );
-    } 
+    }
 }
