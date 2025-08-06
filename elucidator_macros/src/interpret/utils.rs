@@ -86,9 +86,6 @@ pub fn get_type_path_from_vec_args(
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-    use syn::parse_quote;
-
     use super::*;
     
     #[test]
@@ -180,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_get_last_type_path_ok() {
-        let type_path: syn::TypePath = parse_quote!(std::primitive::u8);
+        let type_path: syn::TypePath = syn::parse_quote!(std::primitive::u8);
         let last_segment = get_last_type_path_segment(&type_path);
 
         assert!(last_segment.is_ok());
@@ -191,8 +188,8 @@ mod tests {
 
     #[test]
     fn test_get_type_path_from_vec_args_ok() {
-        let path_segment: syn::PathSegment = parse_quote!(Vec<std::primitive::u8>);
-        let gt: syn::TypePath = parse_quote!(std::primitive::u8);
+        let path_segment: syn::PathSegment = syn::parse_quote!(Vec<std::primitive::u8>);
+        let gt: syn::TypePath = syn::parse_quote!(std::primitive::u8);
         let type_path = get_type_path_from_vec_args(&path_segment);
 
         assert!(type_path.is_ok());
@@ -202,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_get_type_path_from_vec_args_not_vec_fails() {
-        let path_segment: syn::PathSegment = parse_quote!(VecDeque<std::primitive::u8>);
+        let path_segment: syn::PathSegment = syn::parse_quote!(VecDeque<std::primitive::u8>);
         let type_path = get_type_path_from_vec_args(&path_segment);
 
         assert!(type_path.is_err());
@@ -212,7 +209,7 @@ mod tests {
 
     #[test]
     fn test_get_type_path_from_vec_args_no_vec_args_fails() {
-        let path_segment: syn::PathSegment = parse_quote!(Vec<>);
+        let path_segment: syn::PathSegment = syn::parse_quote!(Vec<>);
         let type_path = get_type_path_from_vec_args(&path_segment);
 
         assert!(type_path.is_err());
@@ -222,7 +219,7 @@ mod tests {
 
     #[test]
     fn test_get_type_path_from_vec_args_not_type_path_fails() {
-        let path_segment: syn::PathSegment = parse_quote!(Vec<(u8, u8)>);
+        let path_segment: syn::PathSegment = syn::parse_quote!(Vec<(u8, u8)>);
         let type_path = get_type_path_from_vec_args(&path_segment);
 
         assert!(type_path.is_err());
@@ -232,7 +229,7 @@ mod tests {
 
     #[test]
     fn test_get_type_path_from_vec_args_not_angled_brackets_fails() {
-        let path_segment: syn::PathSegment = parse_quote!(Vec);
+        let path_segment: syn::PathSegment = syn::parse_quote!(Vec);
         let type_path = get_type_path_from_vec_args(&path_segment);
 
         assert!(type_path.is_err());
