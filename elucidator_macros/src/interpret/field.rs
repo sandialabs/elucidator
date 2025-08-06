@@ -199,6 +199,26 @@ mod tests {
         assert!(result.is_err());
         let error = result.err().unwrap();
         assert_eq!(error.to_string(), "unsupported field type, expected `Vec`, array, or primitive `elucidator` type");
-    } 
+    }
+
+    #[test]
+    fn test_display_singleton_ok() {
+        let syn_field: syn::Field = syn::parse_quote!(foo: u8);
+        let result = Field::try_from(&syn_field).unwrap(); 
+        assert_eq!(result.to_string(), "foo: u8");
+    }
     
+    #[test]
+    fn test_display_fixed_ok() {
+        let syn_field: syn::Field = syn::parse_quote!(foo: [u64; 100]);
+        let result = Field::try_from(&syn_field).unwrap(); 
+        assert_eq!(result.to_string(), "foo: u64[100]");
+    }
+
+    #[test]
+    fn test_display_dynamic_ok() {
+        let syn_field: syn::Field = syn::parse_quote!(foo: Vec<i32>);
+        let result = Field::try_from(&syn_field).unwrap(); 
+        assert_eq!(result.to_string(), "foo: i32[]");
+    }
 }
