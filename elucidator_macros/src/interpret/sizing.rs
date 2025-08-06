@@ -10,11 +10,11 @@ use super::utils::get_last_type_path_segment;
 /// purposes.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Sizing {
-    // A field that hold a single element not in a sequence.
+    /// A field that hold a single element not in a sequence.
     Singleton,
-    // A field that holds a sequence of fixed length.
+    /// A field that holds a sequence of fixed length.
     Fixed(usize),
-    // A field that holds a sequence of variable size.
+    /// A field that holds a sequence of variable size.
     Dynamic,
 }
 
