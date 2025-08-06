@@ -16,6 +16,23 @@ pub struct Field {
     field_sizing: Sizing,
 }
 
+impl Field {
+    /// Returns the field's identifier.
+    pub fn get_ident(&self) -> &Identifier {
+        &self.ident
+    }
+
+    /// Returns the field's associate elucidator type.
+    pub fn get_field_type(&self) -> &PrimitiveType {
+        &self.field_type
+    }
+    
+    /// Returns the field's associated elucidator sizing.
+    pub fn get_field_sizing(&self) -> &Sizing {
+        &self.field_sizing
+    }
+}
+
 impl TryFrom<&syn::Field> for Field {
     type Error = syn::Error;
 

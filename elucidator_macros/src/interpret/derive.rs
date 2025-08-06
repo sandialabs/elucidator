@@ -31,14 +31,4 @@ mod tests {
         let generated = result.to_string();
         assert!(generated.contains("impl Interpret for MyStruct"));
     }
-
-    // #[test]
-    // fn test_valid_identifier() {
-    //     let ident: syn::Ident = syn::parse_quote!(valid_name);
-    //     let result = Identifier::try_from(&ident);
-        
-    //     assert!(result.is_ok());
-    //     let identifier = result.unwrap();
-    //     assert_eq!(identifier.ident, "valid_name");
-    // }
 }
